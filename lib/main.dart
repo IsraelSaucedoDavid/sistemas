@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'app_theme.dart';
 import 'dashboard_page.dart';
 import 'login_page.dart';
+import 'notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  await Firebase.initializeApp();
+  
   await Supabase.initialize(
     url: 'https://smnaclfbrefnzrjblfhp.supabase.co',
-    anonKey: 'sb_publishable_AfCDCvn9gEmm2uWoDJQkaQ_j9m8Bk8N',
+    anonKey: 'sb_publishable_NkiA1_tDkTF4AVJ21NTBcA_s1QuChk5',
   );
 
   runApp(const MainApp());
@@ -25,6 +30,13 @@ class MainApp extends StatefulWidget {
 
 class _MainAppState extends State<MainApp> {
   final _themeModeController = ThemeModeController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize notifications in the background
+    NotificationService().init();
+  }
 
   @override
   void dispose() {

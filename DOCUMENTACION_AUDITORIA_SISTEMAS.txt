@@ -1,0 +1,94 @@
+================================================================================
+          DOCUMENTACIÓN TÉCNICA Y FUNCIONAL - AUDITORÍA DE SISTEMAS
+================================================================================
+SISTEMA: Gestión de Activos y Mantenimientos (Sistemas-25486)
+FECHA DE AUDITORÍA: 03 de Mayo de 2026
+ARQUITECTURA: Mobile First (Flutter) + Backend as a Service (Supabase) + Middleware PHP
+
+--------------------------------------------------------------------------------
+1. RESUMEN EJECUTIVO
+--------------------------------------------------------------------------------
+El sistema es una plataforma integral para el control de inventario tecnológico, 
+gestión de mantenimientos preventivos/correctivos y soporte técnico mediante 
+tickets. Está diseñado bajo un modelo de alta disponibilidad, separando la 
+lógica de datos (Supabase) de la lógica de comunicación externa (PHP Hub).
+
+--------------------------------------------------------------------------------
+2. STACK TECNOLÓGICO (ESPECIFICACIONES)
+--------------------------------------------------------------------------------
+- FRONTEND: Flutter SDK (Dart)
+  * Gestión de estado: StatefulWidgets y flujos asíncronos.
+  * Notificaciones locales: flutter_local_notifications (Programación offline).
+  * Comunicación: Protocolo HTTP/HTTPS (Librería http).
+- BACKEND PRINCIPAL: Supabase (PostgreSQL)
+  * Autenticación: Supabase Auth (JWT).
+  * Almacenamiento: Supabase Storage (Evidencias fotográficas).
+  * Base de datos: Esquema relacional con llaves foráneas e integridad referencial.
+- MIDDLEWARE DE COMUNICACIÓN (HOSTINGER): PHP 8.x
+  * Autenticación Firebase: Google OAuth2 (FCM V1).
+  * Correo electrónico: PHPMailer via Office 365.
+  * Seguridad: Validación de JSON y limpieza de llaves privadas.
+
+--------------------------------------------------------------------------------
+3. SUBSISTEMA DE NOTIFICACIONES PUSH (SEGURIDAD DE NIVEL BANCARIO)
+--------------------------------------------------------------------------------
+El sistema ha migrado de la arquitectura Legacy a Firebase Cloud Messaging (FCM) V1.
+
+- FLUJO DE SEGURIDAD:
+  1. La App Flutter solicita una notificación a través de un puente PHP seguro.
+  2. El servidor PHP carga una Service Account (JSON) protegida fuera del alcance del cliente.
+  3. PHP genera un JWT (JSON Web Token) firmado con una llave privada RSA-256.
+  4. Se solicita un Access Token temporal a los servidores de Google Auth.
+  5. El mensaje se entrega a Firebase mediante una petición autenticada via OAuth2.
+
+- VENTAJAS AUDITABLES:
+  * No hay exposición de llaves de Firebase en el código fuente de la App.
+  * Desacoplamiento: Si Firebase cambia su API, solo se actualiza el servidor PHP.
+
+--------------------------------------------------------------------------------
+4. FLUJO DE TRABAJO: TICKET DE SOPORTE (GUEST & AUTH)
+--------------------------------------------------------------------------------
+1. ENTRADA: El usuario envía un ticket desde el portal web o App.
+2. PROCESAMIENTO: 
+   * Se inicia un búfer de salida (ob_start) para evitar fugas de texto.
+   * Se inserta el registro en MySQL/Supabase.
+   * Se dispara el proceso de envío de email (PHPMailer).
+3. NOTIFICACIÓN: El sistema detecta la creación y envía un aviso Push inmediato 
+   a los técnicos encargados, garantizando un tiempo de respuesta (SLA) óptimo.
+
+--------------------------------------------------------------------------------
+5. MÓDULO DE MANTENIMIENTO E INVENTARIO
+--------------------------------------------------------------------------------
+- INTEGRIDAD DE DATOS:
+  * Los activos (Assets) tienen estados vinculados (libre, mantenimiento, etc.).
+  * Los eventos de mantenimiento están vinculados por ID de Activo.
+- AUTOMATIZACIÓN DE RECORDATORIOS:
+  * Local: La App agenda alertas en el sistema operativo del móvil del técnico.
+  * Remoto: El servidor notifica a los supervisores cuando se agenda un nuevo servicio.
+- EVIDENCIA FOTOGRÁFICA:
+  * Implementación de captura de cámara y carga a buckets de almacenamiento 
+    con URLs firmadas temporalmente para mayor privacidad.
+
+--------------------------------------------------------------------------------
+6. CONTROLES DE SEGURIDAD Y CUMPLIMIENTO
+--------------------------------------------------------------------------------
+- AUTENTICACIÓN: Cada técnico tiene credenciales únicas gestionadas por Supabase Auth.
+- PRIVACIDAD: Las llaves del servidor (Service Accounts) se limpian de caracteres 
+  inválidos mediante funciones de sanitización antes de la firma digital.
+- MANEJO DE ERRORES: Implementación de try-catch en Dart y validación de 
+  respuestas JSON en PHP para evitar bloqueos del sistema (UI).
+- PERSISTENCIA: El sistema de "Hot Reload" y refresco automático asegura que 
+  el técnico siempre trabaje con datos vigentes (Real-time sync).
+
+--------------------------------------------------------------------------------
+7. CONCLUSIÓN DE AUDITORÍA
+--------------------------------------------------------------------------------
+El sistema cumple con los criterios de:
+- CONFIDENCIALIDAD: Uso de protocolos HTTPS y tokens de acceso temporales.
+- INTEGRIDAD: Validaciones de campos obligatorios en cliente y servidor.
+- DISPONIBILIDAD: Arquitectura distribuida que soporta fallos parciales sin 
+  detener la operación principal.
+
+================================================================================
+FIN DEL DOCUMENTO
+================================================================================

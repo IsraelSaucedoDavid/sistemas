@@ -4,6 +4,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
 
 import 'app_theme.dart';
+import 'asset_models.dart';
+import 'asset_details_page.dart';
+import 'asset_edit_page.dart';
 import 'photo_manager_page.dart';
 import 'photo_upload_helper.dart';
 
@@ -21,13 +24,19 @@ class _AssetsPageState extends State<AssetsPage> {
   final _modelCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
 
-  final List<String> _statusOptions = ['activo', 'mantenimiento', 'baja'];
+  final List<String> _statusOptions = [
+    'activo',
+    'libre',
+    'mantenimiento',
+    'descompuesto',
+    'baja'
+  ];
 
-  List<_AssetTypeOption> _assetTypes = [];
-  List<_AssetItem> _assets = [];
+  List<AssetTypeOption> _assetTypes = [];
+  List<AssetItem> _assets = [];
   List<DraftPhoto> _pendingPhotos = [];
   String? _selectedTypeId;
-  String _selectedStatus = 'activo';
+  String _selectedStatus = 'libre';
   bool _loading = false;
   bool _saving = false;
   String _statusText = 'Carga de activos pendiente.';
@@ -73,10 +82,10 @@ class _AssetsPageState extends State<AssetsPage> {
           .order('created_at', ascending: false);
 
       final types = (typesResponse as List<dynamic>)
-          .map((e) => _AssetTypeOption.fromMap(e as Map<String, dynamic>))
+          .map((e) => AssetTypeOption.fromMap(e as Map<String, dynamic>))
           .toList();
       final assets = (assetsResponse as List<dynamic>)
-          .map((e) => _AssetItem.fromMap(e as Map<String, dynamic>))
+          .map((e) => AssetItem.fromMap(e as Map<String, dynamic>))
           .toList();
 
       setState(() {
@@ -101,7 +110,7 @@ class _AssetsPageState extends State<AssetsPage> {
     }
   }
 
-  Future<bool> _createAsset() async {
+  Future<bool> _createAsset({void Function(double)? onProgress}) async {
     final typeId = _selectedTypeId;
     final tag = _assetTagCtrl.text.trim();
     final serial = _serialCtrl.text.trim();
@@ -139,11 +148,12 @@ class _AssetsPageState extends State<AssetsPage> {
         final uploadResult = await PhotoUploadHelper.uploadDraftPhotos(
           assetId: createdId,
           photos: _pendingPhotos,
-          description: 'Foto inicial del activo',
+          description: 'Carga inicial de multimedia',
+          onProgress: onProgress,
         );
         statusMsg = uploadResult.ok
             ? '$statusMsg ${uploadResult.message}'
-            : '$statusMsg Error en fotos: ${uploadResult.message}';
+            : '$statusMsg Error en archivos: ${uploadResult.message}';
         if (uploadResult.ok) {
           _pendingPhotos = [];
         }
@@ -193,10 +203,11 @@ class _AssetsPageState extends State<AssetsPage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            Future<void> pickPhotos() async {
+            Future<void> pickMedia() async {
               final result = await FilePicker.platform.pickFiles(
                 withData: true,
                 allowMultiple: true,
+                type: FileType.media,
               );
               final files = result?.files.where((f) => f.bytes != null).toList() ?? [];
               if (files.isEmpty) return;
@@ -205,7 +216,7 @@ class _AssetsPageState extends State<AssetsPage> {
                   files.map(
                     (f) => DraftPhoto(
                       bytes: f.bytes!,
-                      fileName: f.name.isEmpty ? 'foto.jpg' : f.name,
+                      fileName: f.name.isEmpty ? 'media.bin' : f.name,
                     ),
                   ),
                 );
@@ -238,8 +249,56 @@ class _AssetsPageState extends State<AssetsPage> {
             }
 
             Future<void> submit() async {
-              final ok = await _createAsset();
+              final progressNotifier = ValueNotifier<double>(0.0);
+              showDialog(
+                context: this.context,
+                barrierDismissible: false,
+                builder: (BuildContext c) {
+                  return AlertDialog(
+                    elevation: 0,
+                    backgroundColor: Colors.transparent,
+                    content: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const CircularProgressIndicator(color: Colors.white),
+                          const SizedBox(height: 24),
+                          ValueListenableBuilder<double>(
+                            valueListenable: progressNotifier,
+                            builder: (context, val, child) {
+                              return Column(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: LinearProgressIndicator(
+                                      value: val,
+                                      minHeight: 10,
+                                      color: Colors.white,
+                                      backgroundColor: Colors.white24,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'Subiendo multimedia... ${(val * 100).toInt()}%',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+
+              final ok = await _createAsset(onProgress: (p) => progressNotifier.value = p);
               if (!mounted) return;
+              
+              Navigator.of(this.context, rootNavigator: true).pop();
+
               if (ok) {
                 Navigator.of(this.context).pop();
               }
@@ -352,9 +411,9 @@ class _AssetsPageState extends State<AssetsPage> {
                         runSpacing: 8,
                         children: [
                           OutlinedButton.icon(
-                            onPressed: _saving ? null : pickPhotos,
-                            icon: const Icon(Icons.photo_library_outlined),
-                            label: const Text('Agregar 1 o mas'),
+                            onPressed: _saving ? null : pickMedia,
+                            icon: const Icon(Icons.perm_media_outlined),
+                            label: const Text('Multimedia / Videos'),
                           ),
                           OutlinedButton.icon(
                             onPressed: _saving ? null : takePhoto,
@@ -370,40 +429,52 @@ class _AssetsPageState extends State<AssetsPage> {
                           runSpacing: 6,
                           children: List.generate(
                             _pendingPhotos.length,
-                            (index) => Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.memory(
-                                    _pendingPhotos[index].bytes,
-                                    width: 64,
-                                    height: 64,
-                                    fit: BoxFit.cover,
+                            (index) {
+                              final name = _pendingPhotos[index].fileName.toLowerCase();
+                              final isVideo = name.endsWith('.mp4') || name.endsWith('.mov') || name.endsWith('.avi');
+                              return Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      width: 64,
+                                      height: 64,
+                                      color: Colors.black12,
+                                      child: isVideo 
+                                        ? const Icon(Icons.videocam, color: Colors.blueGrey)
+                                        : Image.memory(
+                                            _pendingPhotos[index].bytes,
+                                            width: 64,
+                                            height: 64,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => const Icon(Icons.insert_drive_file_outlined),
+                                          ),
+                                    ),
                                   ),
-                                ),
-                                Positioned(
-                                  top: -8,
-                                  right: -8,
-                                  child: Material(
-                                    color: Colors.red.shade600,
-                                    shape: const CircleBorder(),
-                                    child: InkWell(
-                                      customBorder: const CircleBorder(),
-                                      onTap: _saving ? null : () => removePhoto(index),
-                                      child: const Padding(
-                                        padding: EdgeInsets.all(4),
-                                        child: Icon(
-                                          Icons.close,
-                                          size: 14,
-                                          color: Colors.white,
+                                  Positioned(
+                                    top: -8,
+                                    right: -8,
+                                    child: Material(
+                                      color: Colors.red.shade600,
+                                      shape: const CircleBorder(),
+                                      child: InkWell(
+                                        customBorder: const CircleBorder(),
+                                        onTap: _saving ? null : () => removePhoto(index),
+                                        child: const Padding(
+                                          padding: EdgeInsets.all(4),
+                                          child: Icon(
+                                            Icons.close,
+                                            size: 14,
+                                            color: Colors.white,
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
+                                ],
+                              );
+                            },
                           ),
                         ),
                       ],
@@ -425,7 +496,7 @@ class _AssetsPageState extends State<AssetsPage> {
   }
 
   Future<void> _updateAsset({
-    required _AssetItem asset,
+    required AssetItem asset,
     required String assetTag,
     required String serialNumber,
     required String brand,
@@ -468,15 +539,61 @@ class _AssetsPageState extends State<AssetsPage> {
     }
   }
 
-  Future<void> _markAssetAsBaja(_AssetItem asset) async {
+  Future<void> _openQuickStatusDialog(AssetItem asset) async {
+    String localStatus = asset.status;
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setLocalState) => AlertDialog(
+          title: Text('Estado de ${asset.assetTag}'),
+          content: DropdownButtonFormField<String>(
+            value: localStatus,
+            decoration: const InputDecoration(labelText: 'Selecciona el nuevo estatus'),
+            items: _statusOptions
+                .map((s) => DropdownMenuItem(value: s, child: Text(_statusLabel(s))))
+                .toList(),
+            onChanged: (v) {
+              if (v != null) setLocalState(() => localStatus = v);
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Actualizar'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (saved == true && localStatus != asset.status) {
+      await _updateAsset(
+        asset: asset,
+        assetTag: asset.assetTag,
+        serialNumber: asset.serialNumber ?? '',
+        brand: asset.brand ?? '',
+        model: asset.model ?? '',
+        status: localStatus,
+        assetTypeId: asset.assetTypeId,
+        notes: asset.notes ?? '',
+      );
+    }
+  }
+
+  Future<void> _deleteAsset(AssetItem asset) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Marcar como fuera de uso'),
+          title: const Text('Eliminar permanentemente', style: TextStyle(color: Colors.red)),
           content: Text(
-            'El activo ${asset.assetTag} no se eliminara. '
-            'Solo se marcara como baja.',
+            'Estas a punto de eliminar el activo ${asset.assetTag}.\n\n'
+            'Esta accion no se puede deshacer y borrara completamente el registro de la base de datos.\n\n'
+            '¿Deseas continuar?',
           ),
           actions: [
             TextButton(
@@ -484,8 +601,12 @@ class _AssetsPageState extends State<AssetsPage> {
               child: const Text('Cancelar'),
             ),
             FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
+              ),
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Marcar baja'),
+              child: const Text('Si, eliminar'),
             ),
           ],
         );
@@ -496,181 +617,81 @@ class _AssetsPageState extends State<AssetsPage> {
       return;
     }
 
-    final currentNotes = asset.notes?.trim();
-    final marker = 'Marcado como baja/fuera de uso (${DateTime.now()})';
-    final mergedNotes = (currentNotes == null || currentNotes.isEmpty)
-        ? marker
-        : '$currentNotes\n$marker';
+    setState(() => _saving = true);
+    try {
+      final assignments = await _client
+          .schema('sistema')
+          .from('assignments')
+          .select('id')
+          .eq('asset_id', asset.id)
+          .limit(1);
 
-    await _updateAsset(
-      asset: asset,
-      assetTag: asset.assetTag,
-      serialNumber: asset.serialNumber ?? '',
-      brand: asset.brand ?? '',
-      model: asset.model ?? '',
-      status: 'baja',
-      assetTypeId: asset.assetTypeId,
-      notes: mergedNotes,
-    );
+      if ((assignments as List).isNotEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se puede eliminar. El activo tiene historial de asignaciones. Utiliza la opcion de "Marcar como baja".'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+          ),
+        );
+        setState(() => _saving = false);
+        return;
+      }
+
+      await _client.schema('sistema').from('assets').delete().eq('id', asset.id);
+
+      setState(() => _statusText = 'Activo ${asset.assetTag} eliminado permanentemente.');
+      await _loadData();
+    } on PostgrestException catch (e) {
+      setState(() => _statusText = 'Error al eliminar: ${e.message}');
+    } catch (e) {
+      setState(() => _statusText = 'Error inesperado: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
   }
 
-  Future<void> _openEditDialog(_AssetItem asset) async {
-    final formKey = GlobalKey<FormState>();
-    final tagCtrl = TextEditingController(text: asset.assetTag);
-    final serialCtrl = TextEditingController(text: asset.serialNumber ?? '');
-    final brandCtrl = TextEditingController(text: asset.brand ?? '');
-    final modelCtrl = TextEditingController(text: asset.model ?? '');
-    final notesCtrl = TextEditingController(text: asset.notes ?? '');
-    String currentStatus = asset.status;
-    String? currentTypeId = asset.assetTypeId;
-
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setLocalState) {
-            return AlertDialog(
-              title: Text('Editar ${asset.assetTag}'),
-              content: Form(
-                key: formKey,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextFormField(
-                        controller: tagCtrl,
-                        decoration: const InputDecoration(labelText: 'Asset Tag *'),
-                        validator: (value) => (value == null || value.trim().isEmpty)
-                            ? 'Requerido'
-                            : null,
-                      ),
-                      const SizedBox(height: 10),
-                      TextFormField(
-                        controller: serialCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Numero de serie',
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      InputDecorator(
-                        decoration: const InputDecoration(labelText: 'Tipo de activo'),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: currentTypeId,
-                            isExpanded: true,
-                            hint: const Text('Selecciona tipo'),
-                            items: _assetTypes
-                                .map(
-                                  (type) => DropdownMenuItem<String>(
-                                    value: type.id,
-                                    child: Text(type.name),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) {
-                              setLocalState(() => currentTypeId = value);
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextFormField(
-                        controller: brandCtrl,
-                        decoration: const InputDecoration(labelText: 'Marca'),
-                      ),
-                      const SizedBox(height: 10),
-                      TextFormField(
-                        controller: modelCtrl,
-                        decoration: const InputDecoration(labelText: 'Modelo'),
-                      ),
-                      const SizedBox(height: 10),
-                      InputDecorator(
-                        decoration: const InputDecoration(labelText: 'Estatus'),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: currentStatus,
-                            isExpanded: true,
-                            items: _statusOptions
-                                .map(
-                                  (status) => DropdownMenuItem<String>(
-                                    value: status,
-                                    child: Text(_statusLabel(status)),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) {
-                              if (value != null) {
-                                setLocalState(() => currentStatus = value);
-                              }
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextFormField(
-                        controller: notesCtrl,
-                        minLines: 2,
-                        maxLines: 4,
-                        decoration: const InputDecoration(labelText: 'Notas'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Cancelar'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    if (formKey.currentState?.validate() == true) {
-                      Navigator.of(context).pop(true);
-                    }
-                  },
-                  child: const Text('Guardar cambios'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+  Future<void> _openEditPage(AssetItem asset) async {
+    final updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => AssetEditPage(
+          asset: asset,
+          assetTypes: _assetTypes,
+          statusOptions: _statusOptions,
+        ),
+      ),
     );
 
-    if (saved == true) {
-      await _updateAsset(
-        asset: asset,
-        assetTag: tagCtrl.text,
-        serialNumber: serialCtrl.text,
-        brand: brandCtrl.text,
-        model: modelCtrl.text,
-        status: currentStatus,
-        assetTypeId: currentTypeId,
-        notes: notesCtrl.text,
-      );
+    if (updated == true) {
+      await _loadData();
     }
-
-    tagCtrl.dispose();
-    serialCtrl.dispose();
-    brandCtrl.dispose();
-    modelCtrl.dispose();
-    notesCtrl.dispose();
   }
 
   String _statusLabel(String status) {
     switch (status) {
-      case 'activo':
-        return 'Activo';
+      case 'funcionando':
+        return 'Funcionando';
+      case 'libre':
+        return 'Libre';
+      case 'asignado':
+        return 'Asignado';
       case 'mantenimiento':
-        return 'Descompuesto / Mantenimiento';
+        return 'En Mantenimiento';
+      case 'descompuesto':
+        return 'Descompuesto';
       case 'baja':
         return 'Fuera de uso / Baja';
+      case 'activo':
+        return 'Activo (Antiguo)';
       default:
         return status;
     }
   }
 
-  Future<void> _openAssetPhotoManager(_AssetItem asset) async {
+  Future<void> _openAssetPhotoManager(AssetItem asset) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => PhotoManagerPage(
@@ -684,12 +705,20 @@ class _AssetsPageState extends State<AssetsPage> {
 
   Color _statusColor(String status) {
     switch (status) {
-      case 'activo':
+      case 'funcionando':
         return Colors.green.shade700;
+      case 'libre':
+        return Colors.blue.shade700;
+      case 'asignado':
+        return Colors.deepPurple.shade700;
       case 'mantenimiento':
         return Colors.orange.shade700;
-      case 'baja':
+      case 'descompuesto':
         return Colors.red.shade700;
+      case 'baja':
+        return Colors.blueGrey.shade800;
+      case 'activo':
+        return Colors.green.shade700;
       default:
         return Colors.grey.shade700;
     }
@@ -730,7 +759,9 @@ class _AssetsPageState extends State<AssetsPage> {
             const Text('No hay activos para mostrar.')
           else
             ..._assets.map(
-              (asset) => Card(
+              (asset) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Card(
                 child: ListTile(
                   leading: Icon(
                     Icons.computer,
@@ -747,29 +778,67 @@ class _AssetsPageState extends State<AssetsPage> {
                   trailing: PopupMenuButton<String>(
                     onSelected: (value) {
                       if (value == 'editar') {
-                        _openEditDialog(asset);
-                      } else if (value == 'baja') {
-                        _markAssetAsBaja(asset);
-                      } else if (value == 'foto') {
-                        _openAssetPhotoManager(asset);
+                        _openEditPage(asset);
+                      } else if (value == 'estatus') {
+                        _openQuickStatusDialog(asset);
+                      } else if (value == 'eliminar') {
+                        _deleteAsset(asset);
                       }
                     },
                     itemBuilder: (context) => const [
                       PopupMenuItem<String>(
-                        value: 'foto',
-                        child: Text('Gestionar fotos'),
-                      ),
-                      PopupMenuItem<String>(
                         value: 'editar',
-                        child: Text('Editar'),
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined, size: 20),
+                            SizedBox(width: 8),
+                            Text('Editar información'),
+                          ],
+                        ),
                       ),
                       PopupMenuItem<String>(
-                        value: 'baja',
-                        child: Text('Marcar fuera de uso (baja)'),
+                        value: 'estatus',
+                        child: Row(
+                          children: [
+                            Icon(Icons.sync_alt, size: 20),
+                            SizedBox(width: 8),
+                            Text('Cambiar estatus'),
+                          ],
+                        ),
+                      ),
+                      PopupMenuDivider(),
+                      PopupMenuItem<String>(
+                        value: 'eliminar',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text(
+                              'Eliminar definitivamente',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                  onTap: () => _openEditDialog(asset),
+                  onTap: () {
+                    final type = _assetTypes.cast<AssetTypeOption?>().firstWhere(
+                      (t) => t?.id == asset.assetTypeId,
+                      orElse: () => null,
+                    );
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => AssetDetailsPage(
+                          asset: asset,
+                          typeName: type?.name,
+                          assetTypes: _assetTypes,
+                          statusOptions: _statusOptions,
+                        ),
+                      ),
+                    );
+                  },
+                ),
                 ),
               ),
             ),
@@ -785,54 +854,3 @@ class _AssetsPageState extends State<AssetsPage> {
   }
 }
 
-class _AssetTypeOption {
-  final String id;
-  final String name;
-
-  const _AssetTypeOption({
-    required this.id,
-    required this.name,
-  });
-
-  factory _AssetTypeOption.fromMap(Map<String, dynamic> map) {
-    return _AssetTypeOption(
-      id: map['id']?.toString() ?? '',
-      name: map['name']?.toString() ?? 'Sin nombre',
-    );
-  }
-}
-
-class _AssetItem {
-  final String id;
-  final String assetTag;
-  final String? serialNumber;
-  final String? brand;
-  final String? model;
-  final String status;
-  final String? assetTypeId;
-  final String? notes;
-
-  const _AssetItem({
-    required this.id,
-    required this.assetTag,
-    required this.serialNumber,
-    required this.brand,
-    required this.model,
-    required this.status,
-    required this.assetTypeId,
-    required this.notes,
-  });
-
-  factory _AssetItem.fromMap(Map<String, dynamic> map) {
-    return _AssetItem(
-      id: map['id']?.toString() ?? '',
-      assetTag: map['asset_tag']?.toString() ?? 'Sin tag',
-      serialNumber: map['serial_number']?.toString(),
-      brand: map['brand']?.toString(),
-      model: map['model']?.toString(),
-      status: map['status']?.toString() ?? 'activo',
-      assetTypeId: map['asset_type_id']?.toString(),
-      notes: map['notes']?.toString(),
-    );
-  }
-}

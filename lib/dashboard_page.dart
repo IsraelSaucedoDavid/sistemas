@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'notification_service.dart';
 
 import 'account_settings_page.dart';
 import 'assignments_page.dart';
@@ -7,6 +9,8 @@ import 'app_theme.dart';
 import 'assets_page.dart';
 import 'login_page.dart';
 import 'maintenance_page.dart';
+import 'maintenance_calendar_page.dart';
+import 'tickets_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -59,14 +63,20 @@ class _DashboardPageState extends State<DashboardPage> {
       final maints = maintRows as List<dynamic>;
       final docs = docsRows as List<dynamic>;
 
-      int activos = 0;
-      int assetMantenimiento = 0;
-      int assetBaja = 0;
+      int funcionando = 0;
+      int libre = 0;
+      int asignado = 0;
+      int mantenimiento = 0;
+      int descompuesto = 0;
+      int baja = 0;
       for (final row in assets) {
         final status = (row as Map<String, dynamic>)['status']?.toString() ?? '';
-        if (status == 'activo') activos++;
-        if (status == 'mantenimiento') assetMantenimiento++;
-        if (status == 'baja') assetBaja++;
+        if (status == 'funcionando' || status == 'activo') funcionando++;
+        if (status == 'libre') libre++;
+        if (status == 'asignado') asignado++;
+        if (status == 'mantenimiento') mantenimiento++;
+        if (status == 'descompuesto') descompuesto++;
+        if (status == 'baja') baja++;
       }
 
       int pend = 0;
@@ -102,9 +112,12 @@ class _DashboardPageState extends State<DashboardPage> {
       setState(() {
         _stats = _DashboardStats(
           totalAssets: assets.length,
-          assetsActivos: activos,
-          assetsMantenimiento: assetMantenimiento,
-          assetsBaja: assetBaja,
+          assetsFuncionando: funcionando,
+          assetsLibre: libre,
+          assetsAsignado: asignado,
+          assetsMantenimiento: mantenimiento,
+          assetsDescompuesto: descompuesto,
+          assetsBaja: baja,
           totalMantenimientos: maints.length,
           mtPendientes: pend,
           mtEnProceso: enProceso,
@@ -133,6 +146,52 @@ class _DashboardPageState extends State<DashboardPage> {
       appBar: AppBar(
         title: const Text('Dashboard TI'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_active_outlined),
+            tooltip: 'Ver FCM Token',
+            onPressed: () async {
+              final token = await NotificationService().getToken();
+              if (context.mounted) {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Token de Notificación'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Copia este código y pásamelo para configurar las alertas en el servidor:',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        const SizedBox(height: 12),
+                        SelectableText(
+                          token ?? 'Cargando o no disponible...',
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: token ?? ''));
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Token copiado')),
+                          );
+                        },
+                        child: const Text('Copiar'),
+                      ),
+                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cerrar')),
+                    ],
+                  ),
+                );
+              }
+            },
+          ),
           const ThemeToggleButton(),
           IconButton(
             tooltip: 'Actualizar',
@@ -189,6 +248,26 @@ class _DashboardPageState extends State<DashboardPage> {
                   Navigator.of(context).pop();
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const MaintenancePage()),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.confirmation_number_outlined),
+                title: const Text('Tickets de Soporte'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const TicketsPage()),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.calendar_month_outlined),
+                title: const Text('Calendario'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const MaintenanceCalendarPage()),
                   );
                 },
               ),
@@ -252,11 +331,11 @@ class _DashboardPageState extends State<DashboardPage> {
                     runSpacing: 8,
                     children: [
                       _StatChip(label: 'Total', value: _stats.totalAssets.toString()),
-                      _StatChip(label: 'Activos', value: _stats.assetsActivos.toString()),
-                      _StatChip(
-                        label: 'En mantenimiento',
-                        value: _stats.assetsMantenimiento.toString(),
-                      ),
+                      _StatChip(label: 'Funcionando', value: _stats.assetsFuncionando.toString()),
+                      _StatChip(label: 'Libre', value: _stats.assetsLibre.toString()),
+                      _StatChip(label: 'Asignado', value: _stats.assetsAsignado.toString()),
+                      _StatChip(label: 'Mantenimiento', value: _stats.assetsMantenimiento.toString()),
+                      _StatChip(label: 'Descompuesto', value: _stats.assetsDescompuesto.toString()),
                       _StatChip(label: 'Baja', value: _stats.assetsBaja.toString()),
                     ],
                   ),
@@ -357,8 +436,11 @@ class _StatChip extends StatelessWidget {
 
 class _DashboardStats {
   final int totalAssets;
-  final int assetsActivos;
+  final int assetsFuncionando;
+  final int assetsLibre;
+  final int assetsAsignado;
   final int assetsMantenimiento;
+  final int assetsDescompuesto;
   final int assetsBaja;
   final int totalMantenimientos;
   final int mtPendientes;
@@ -370,8 +452,11 @@ class _DashboardStats {
 
   const _DashboardStats({
     required this.totalAssets,
-    required this.assetsActivos,
+    required this.assetsFuncionando,
+    required this.assetsLibre,
+    required this.assetsAsignado,
     required this.assetsMantenimiento,
+    required this.assetsDescompuesto,
     required this.assetsBaja,
     required this.totalMantenimientos,
     required this.mtPendientes,
@@ -385,8 +470,11 @@ class _DashboardStats {
   factory _DashboardStats.empty() {
     return const _DashboardStats(
       totalAssets: 0,
-      assetsActivos: 0,
+      assetsFuncionando: 0,
+      assetsLibre: 0,
+      assetsAsignado: 0,
       assetsMantenimiento: 0,
+      assetsDescompuesto: 0,
       assetsBaja: 0,
       totalMantenimientos: 0,
       mtPendientes: 0,

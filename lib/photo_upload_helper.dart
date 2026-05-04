@@ -276,6 +276,7 @@ class PhotoUploadHelper {
     String? maintenanceEventId,
     String? description,
     required List<DraftPhoto> photos,
+    void Function(double)? onProgress,
   }) async {
     final client = Supabase.instance.client;
     if (client.auth.currentSession == null) {
@@ -292,18 +293,22 @@ class PhotoUploadHelper {
     }
 
     try {
-      for (final photo in photos) {
+      for (int i = 0; i < photos.length; i++) {
+        if (onProgress != null) {
+          onProgress(i / photos.length);
+        }
         await _uploadSinglePhoto(
           assetId: assetId,
           maintenanceEventId: maintenanceEventId,
           description: description,
-          bytes: photo.bytes,
-          fileName: photo.fileName,
+          bytes: photos[i].bytes,
+          fileName: photos[i].fileName,
         );
       }
+      if (onProgress != null) onProgress(1.0);
       return PhotoUploadResult(
         ok: true,
-        message: 'Fotos guardadas: ${photos.length}.',
+        message: 'Archivos guardados: ${photos.length}.',
       );
     } on StorageException catch (e) {
       return PhotoUploadResult(

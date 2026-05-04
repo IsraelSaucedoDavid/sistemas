@@ -122,25 +122,33 @@ class _PhotoManagerPageState extends State<PhotoManagerPage> {
   }
 
   void _openPreview(String url, String title) {
-    showDialog<void>(
-      context: context,
-      builder: (context) {
-        return Dialog(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (context) {
+          return Scaffold(
+            backgroundColor: Colors.black,
+            appBar: AppBar(
+              backgroundColor: Colors.black,
+              foregroundColor: Colors.white,
+              title: Text(title, style: const TextStyle(fontSize: 16)),
+              iconTheme: const IconThemeData(color: Colors.white),
+            ),
+            body: Center(
+              child: InteractiveViewer(
+                minScale: 1.0,
+                maxScale: 5.0,
+                child: Image.network(
+                  url, 
+                  fit: BoxFit.contain,
+                  width: double.infinity,
+                  height: double.infinity,
+                ),
               ),
-              InteractiveViewer(
-                child: Image.network(url, fit: BoxFit.contain),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -208,33 +216,86 @@ class _PhotoManagerPageState extends State<PhotoManagerPage> {
             if (_photos.isEmpty)
               const SectionCard(child: Text('No hay fotos guardadas.'))
             else
-              ..._photos.map(
-                (photo) => FutureBuilder<String>(
-                key: ValueKey(photo.id),
-                future: PhotoUploadHelper.getSignedPhotoUrl(photo.filePath),
-                builder: (context, snapshot) {
-                  final url = snapshot.data;
-                  return Card(
-                    child: ListTile(
-                      leading: SizedBox(
-                        width: 56,
-                        height: 56,
-                        child: (url == null)
-                            ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
-                            : Image.network(url, fit: BoxFit.cover),
-                      ),
-                      title: Text(photo.description ?? 'Sin descripcion'),
-                      subtitle: Text(photo.filePath),
-                      onTap: url == null ? null : () => _openPreview(url, photo.filePath),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: _loading ? null : () => _deletePhoto(photo),
-                      ),
-                    ),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                ),
+                itemCount: _photos.length,
+                itemBuilder: (context, index) {
+                  final photo = _photos[index];
+                  return FutureBuilder<String>(
+                    key: ValueKey(photo.id),
+                    future: PhotoUploadHelper.getSignedPhotoUrl(photo.filePath),
+                    builder: (context, snapshot) {
+                      final url = snapshot.data;
+                      return GestureDetector(
+                        onTap: url == null ? null : () => _openPreview(url, photo.description ?? 'Foto del activo'),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              if (url == null)
+                                Container(
+                                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                  child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                )
+                              else
+                                Image.network(url, fit: BoxFit.cover),
+                              
+                              // Botón de eliminar en la esquina
+                              Positioned(
+                                top: 4,
+                                right: 4,
+                                child: Material(
+                                  color: Colors.black54,
+                                  shape: const CircleBorder(),
+                                  child: InkWell(
+                                    customBorder: const CircleBorder(),
+                                    onTap: _loading ? null : () => _deletePhoto(photo),
+                                    child: const Padding(
+                                      padding: EdgeInsets.all(6),
+                                      child: Icon(Icons.delete_outline, size: 18, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              
+                              // Descripción difuminada en la parte inferior si existe
+                              if (photo.description != null && photo.description!.isNotEmpty)
+                                Positioned(
+                                  bottom: 0,
+                                  left: 0,
+                                  right: 0,
+                                  child: Container(
+                                    padding: const EdgeInsets.fromLTRB(6, 12, 6, 4),
+                                    decoration: const BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.bottomCenter,
+                                        end: Alignment.topCenter,
+                                        colors: [Colors.black87, Colors.transparent],
+                                      ),
+                                    ),
+                                    child: Text(
+                                      photo.description!,
+                                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
               ),
-            ),
           ],
         ),
       ),
