@@ -57,9 +57,15 @@ class ExternalPerson {
 
 class PersonDirectoryService {
   static String get _baseUrl =>
-      const String.fromEnvironment('CONTACTO_API_URL', defaultValue: '');
+      const String.fromEnvironment(
+        'CONTACTO_API_URL',
+        defaultValue: 'https://reclutamiento-promsan.com/api-sistemas/contacto.php',
+      );
   static String get _token =>
-      const String.fromEnvironment('CONTACTO_API_TOKEN', defaultValue: '');
+      const String.fromEnvironment(
+        'CONTACTO_API_TOKEN',
+        defaultValue: 'SistemasTK2026',
+      );
 
   static Future<List<ExternalPerson>> searchPeople(String query) async {
     final q = query.trim();
@@ -121,6 +127,12 @@ class PersonDirectoryService {
     );
 
     if (response.statusCode != 200) {
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['error'] != null) {
+          throw Exception('${decoded['error']}${decoded['details'] != null ? ': ${decoded['details']}' : ''}');
+        }
+      } catch (_) {}
       throw Exception('Error API contacto (${response.statusCode})');
     }
 

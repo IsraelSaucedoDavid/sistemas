@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 // ─────────────────────────── Modelos ───────────────────────────
@@ -164,15 +165,20 @@ class TicketService {
     String estado = 'todos',
     int page = 1,
     int limit = 30,
+    String? fechaDesde,
+    String? fechaHasta,
   }) async {
     final uri = Uri.parse('$_baseUrl/get_tickets.php').replace(
       queryParameters: {
-        if (estado != 'todos') 'estado': estado,
+        'estado': estado,
         'page': page.toString(),
         'limit': limit.toString(),
+        if (fechaDesde != null && fechaDesde.isNotEmpty) 'fecha_desde': fechaDesde,
+        if (fechaHasta != null && fechaHasta.isNotEmpty) 'fecha_hasta': fechaHasta,
       },
     );
 
+    debugPrint('TicketService: GET $uri');
     final response = await http.get(uri, headers: _headers)
         .timeout(const Duration(seconds: 15));
 
@@ -187,6 +193,7 @@ class TicketService {
 
     final data = decoded['data'] as Map<String, dynamic>;
     final rows = data['tickets'] as List<dynamic>;
+    debugPrint('TicketService: Recibidos ${rows.length} tickets');
     return rows
         .whereType<Map<String, dynamic>>()
         .map(Ticket.fromMap)
@@ -249,5 +256,24 @@ class TicketService {
     if (decoded['success'] != true) {
       throw Exception(decoded['error']?.toString() ?? 'Error al actualizar');
     }
+  }
+
+  static Future<List<Map<String, dynamic>>> getNotifications() async {
+    final uri = Uri.parse('$_baseUrl/get_notifications.php');
+
+    final response = await http.get(uri, headers: _headers)
+        .timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200) {
+      throw Exception('Error al obtener notificaciones (${response.statusCode})');
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    if (decoded['success'] != true) {
+      throw Exception(decoded['error']?.toString() ?? 'Error desconocido');
+    }
+
+    final rows = decoded['data'] as List<dynamic>;
+    return rows.whereType<Map<String, dynamic>>().toList();
   }
 }

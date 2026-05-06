@@ -56,8 +56,27 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
     setState(() { _loading = true; _error = null; });
     try {
       final estado = _tabValues[_tabController.index];
-      final list   = await TicketService.getTickets(estado: estado, limit: 100);
-      setState(() => _tickets = list);
+      
+      // Calcular fecha_desde para la API
+      String? desde;
+      final now = DateTime.now();
+      if (_filtroTiempo == _FiltroTiempo.hoy) {
+        desde = DateFormat('yyyy-MM-dd').format(now);
+      } else if (_filtroTiempo == _FiltroTiempo.semana) {
+        desde = DateFormat('yyyy-MM-dd').format(now.subtract(const Duration(days: 7)));
+      } else if (_filtroTiempo == _FiltroTiempo.mes) {
+        desde = DateFormat('yyyy-MM-dd').format(DateTime(now.year, now.month, 1));
+      }
+
+      final list = await TicketService.getTickets(
+        estado: estado, 
+        limit: (estado == 'todos') ? 500 : 200,
+        fechaDesde: desde,
+      );
+      setState(() {
+        _tickets = list;
+        debugPrint('TicketsPage: _tickets cargados (${list.length}) para estado: $estado');
+      });
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -74,17 +93,20 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
       if (_filtroTiempo == _FiltroTiempo.todos) return true;
       final dt = DateTime.tryParse(t.createdAt)?.toLocal();
       if (dt == null) return false;
+
       switch (_filtroTiempo) {
         case _FiltroTiempo.hoy:
-          return dt.isAfter(today);
+          return dt.year == today.year && dt.month == today.month && dt.day == today.day;
         case _FiltroTiempo.semana:
           return dt.isAfter(today.subtract(const Duration(days: 7)));
         case _FiltroTiempo.mes:
-          return dt.isAfter(DateTime(now.year, now.month, 1));
+          return dt.year == now.year && dt.month == now.month;
         default:
           return true;
       }
     }).toList();
+
+    debugPrint('TicketsPage: _ticketsFiltrados (${lista.length}) para filtro: ${_filtroTiempo.label}');
 
     // Ordenar por created_at
     lista.sort((a, b) {
@@ -123,7 +145,7 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
     final h = segundos ~/ 3600;
     final d = h ~/ 24;
     if (d >= 1) return '$d d ${h % 24} h';
-    return '${h} h ${(segundos % 3600) ~/ 60} min';
+    return '$h h ${(segundos % 3600) ~/ 60} min';
   }
 
   Color _tiempoColor(int? segundos) {
@@ -186,7 +208,10 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
             // ── Filtros de tiempo ──
             _FiltroTiempoBar(
               seleccionado: _filtroTiempo,
-              onChanged: (f) => setState(() => _filtroTiempo = f),
+              onChanged: (f) {
+                setState(() => _filtroTiempo = f);
+                _loadTickets();
+              },
             ),
             // ── Contador ──
             if (!_loading && _error == null)

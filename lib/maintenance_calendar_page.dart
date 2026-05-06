@@ -18,7 +18,7 @@ class _MaintenanceCalendarPageState extends State<MaintenanceCalendarPage> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   Map<DateTime, List<MaintenanceItem>> _events = {};
-  bool _loading = false;
+
 
   // For navigating to details, we need the context info
   List<MaintenanceAssetOption> _assets = [];
@@ -33,7 +33,8 @@ class _MaintenanceCalendarPageState extends State<MaintenanceCalendarPage> {
   }
 
   Future<void> _loadData() async {
-    setState(() => _loading = true);
+    // Cargando datos del calendario
+    setState(() {});
     try {
       final client = Supabase.instance.client;
       
@@ -78,7 +79,7 @@ class _MaintenanceCalendarPageState extends State<MaintenanceCalendarPage> {
     } catch (e) {
       debugPrint('Error loading calendar data: $e');
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() {}); // isLoading done
     }
   }
 
@@ -257,7 +258,7 @@ class _MaintenanceCalendarPageState extends State<MaintenanceCalendarPage> {
     required String description,
     required DateTime date,
   }) async {
-    setState(() => _loading = true);
+    // Guardando evento
     try {
       final client = Supabase.instance.client;
       final y = date.year.toString().padLeft(4, '0');
@@ -286,7 +287,7 @@ class _MaintenanceCalendarPageState extends State<MaintenanceCalendarPage> {
         );
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() {}); // saving done
     }
   }
 
@@ -314,7 +315,7 @@ class _MaintenanceCalendarPageState extends State<MaintenanceCalendarPage> {
                 if (!isGeneralNote) ...[
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: selectedAssetId,
+                    initialValue: selectedAssetId,
                     isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Activo *'),
                     items: _assets.map((a) => DropdownMenuItem(value: a.id, child: Text(a.label))).toList(),
@@ -323,7 +324,7 @@ class _MaintenanceCalendarPageState extends State<MaintenanceCalendarPage> {
                 ],
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: selectedType,
+                  initialValue: selectedType,
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Tipo'),
                   items: const [
@@ -335,7 +336,7 @@ class _MaintenanceCalendarPageState extends State<MaintenanceCalendarPage> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
-                  value: reminderDays,
+                  initialValue: reminderDays,
                   decoration: const InputDecoration(labelText: 'Recordatorio'),
                   items: const [
                     DropdownMenuItem(value: 0, child: Text('Mismo día')),

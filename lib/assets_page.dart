@@ -110,6 +110,69 @@ class _AssetsPageState extends State<AssetsPage> {
     }
   }
 
+  Future<void> _showAddAssetTypeDialog({StateSetter? setSheetState}) async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Nuevo tipo de activo'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'Nombre del tipo',
+            hintText: 'Ej: Laptop, Monitor, Impresora...',
+          ),
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Agregar'),
+          ),
+        ],
+      ),
+    );
+
+    if (name != null && name.isNotEmpty) {
+      setState(() => _saving = true);
+      try {
+        final result = await _client.schema('sistema').from('asset_types').insert({
+          'name': name,
+        }).select().single();
+
+        final newType = AssetTypeOption.fromMap(result);
+        
+        // Recargar datos y seleccionar el nuevo
+        await _loadData();
+        setState(() {
+          _selectedTypeId = newType.id;
+        });
+        if (setSheetState != null) {
+          setSheetState(() {});
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Tipo "$name" agregado')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al agregar tipo: $e'), backgroundColor: Colors.red),
+          );
+        }
+      } finally {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
   Future<bool> _createAsset({void Function(double)? onProgress}) async {
     final typeId = _selectedTypeId;
     final tag = _assetTagCtrl.text.trim();
@@ -333,29 +396,45 @@ class _AssetsPageState extends State<AssetsPage> {
                         decoration: const InputDecoration(labelText: 'Numero de serie'),
                       ),
                       const SizedBox(height: 12),
-                      InputDecorator(
-                        decoration: const InputDecoration(labelText: 'Tipo de activo *'),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            isExpanded: true,
-                            value: _selectedTypeId,
-                            hint: const Text('Selecciona tipo'),
-                            items: _assetTypes
-                                .map(
-                                  (type) => DropdownMenuItem<String>(
-                                    value: type.id,
-                                    child: Text(type.name),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: _saving
-                                ? null
-                                : (value) {
-                                    setState(() => _selectedTypeId = value);
-                                    setSheetState(() {});
-                                  },
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: InputDecorator(
+                              decoration: const InputDecoration(labelText: 'Tipo de activo *'),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  isExpanded: true,
+                                  value: _selectedTypeId,
+                                  hint: const Text('Selecciona tipo'),
+                                  items: _assetTypes
+                                      .map(
+                                        (type) => DropdownMenuItem<String>(
+                                          value: type.id,
+                                          child: Text(type.name),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: _saving
+                                      ? null
+                                      : (value) {
+                                          setState(() => _selectedTypeId = value);
+                                          setSheetState(() {});
+                                        },
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: IconButton.filledTonal(
+                              onPressed: _saving ? null : () => _showAddAssetTypeDialog(setSheetState: setSheetState),
+                              icon: const Icon(Icons.add),
+                              tooltip: 'Agregar nuevo tipo',
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 12),
                       TextField(
@@ -448,7 +527,7 @@ class _AssetsPageState extends State<AssetsPage> {
                                             width: 64,
                                             height: 64,
                                             fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) => const Icon(Icons.insert_drive_file_outlined),
+                                            errorBuilder: (ec, em, es) => const Icon(Icons.insert_drive_file_outlined),
                                           ),
                                     ),
                                   ),
@@ -547,7 +626,7 @@ class _AssetsPageState extends State<AssetsPage> {
         builder: (context, setLocalState) => AlertDialog(
           title: Text('Estado de ${asset.assetTag}'),
           content: DropdownButtonFormField<String>(
-            value: localStatus,
+            initialValue: localStatus,
             decoration: const InputDecoration(labelText: 'Selecciona el nuevo estatus'),
             items: _statusOptions
                 .map((s) => DropdownMenuItem(value: s, child: Text(_statusLabel(s))))
@@ -691,6 +770,7 @@ class _AssetsPageState extends State<AssetsPage> {
     }
   }
 
+  @pragma('vm:entry-point')
   Future<void> _openAssetPhotoManager(AssetItem asset) async {
     await Navigator.of(context).push(
       MaterialPageRoute(

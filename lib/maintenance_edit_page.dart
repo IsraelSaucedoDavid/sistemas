@@ -43,7 +43,7 @@ class _MaintenanceEditPageState extends State<MaintenanceEditPage> {
   String _repeatInterval = 'none';
 
   List<PhotoDocument> _existingPhotos = [];
-  List<DraftPhoto> _newPhotos = [];
+  final List<DraftPhoto> _newPhotos = [];
   bool _loadingPhotos = false;
   bool _saving = false;
 
@@ -221,7 +221,9 @@ class _MaintenanceEditPageState extends State<MaintenanceEditPage> {
 
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al guardar: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al guardar: $e')));
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -264,7 +266,7 @@ class _MaintenanceEditPageState extends State<MaintenanceEditPage> {
                     Text('Información General', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
-                      value: _selectedAssetId,
+                      initialValue: _selectedAssetId,
                       isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Activo *'),
                       items: widget.assets.map((a) => DropdownMenuItem(value: a.id, child: Text(a.label))).toList(),
@@ -305,7 +307,7 @@ class _MaintenanceEditPageState extends State<MaintenanceEditPage> {
                       children: [
                         Expanded(
                           child: DropdownButtonFormField<int>(
-                            value: _reminderDays,
+                            initialValue: _reminderDays,
                             style: const TextStyle(fontSize: 14),
                             decoration: const InputDecoration(
                               labelText: 'Recordatorio',
@@ -323,7 +325,7 @@ class _MaintenanceEditPageState extends State<MaintenanceEditPage> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _repeatInterval,
+                            initialValue: _repeatInterval,
                             style: const TextStyle(fontSize: 14),
                             decoration: const InputDecoration(
                               labelText: 'Repetir',
@@ -345,7 +347,7 @@ class _MaintenanceEditPageState extends State<MaintenanceEditPage> {
                       children: [
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _selectedType,
+                            initialValue: _selectedType,
                             isExpanded: true,
                             style: const TextStyle(fontSize: 14),
                             decoration: const InputDecoration(
@@ -359,7 +361,7 @@ class _MaintenanceEditPageState extends State<MaintenanceEditPage> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _selectedStatus,
+                            initialValue: _selectedStatus,
                             isExpanded: true,
                             style: const TextStyle(fontSize: 14),
                             decoration: const InputDecoration(

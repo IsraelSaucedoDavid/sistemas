@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 
 import 'app_theme.dart';
-import 'photo_manager_page.dart';
-import 'photo_upload_helper.dart';
 import 'maintenance_details_page.dart';
 import 'maintenance_edit_page.dart';
 import 'maintenance_calendar_page.dart';
@@ -230,7 +226,7 @@ class _MaintenancePageState extends State<MaintenancePage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
-                  value: selectedAssetId,
+                  initialValue: selectedAssetId,
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Activo *'),
                   items: _assets.map((a) => DropdownMenuItem(value: a.id, child: Text(a.label))).toList(),
@@ -238,7 +234,7 @@ class _MaintenancePageState extends State<MaintenancePage> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: selectedType,
+                  initialValue: selectedType,
                   decoration: const InputDecoration(labelText: 'Tipo'),
                   items: const [
                     DropdownMenuItem(value: 'preventivo', child: Text('Preventivo')),
@@ -279,7 +275,7 @@ class _MaintenancePageState extends State<MaintenancePage> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: repeatInterval,
+                  initialValue: repeatInterval,
                   decoration: const InputDecoration(labelText: 'Repetir alerta'),
                   items: const [
                     DropdownMenuItem(value: 'none', child: Text('No repetir')),
@@ -291,7 +287,7 @@ class _MaintenancePageState extends State<MaintenancePage> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
-                  value: reminderDays,
+                  initialValue: reminderDays,
                   decoration: const InputDecoration(labelText: 'Recordatorio'),
                   items: const [
                     DropdownMenuItem(value: 0, child: Text('Mismo día')),

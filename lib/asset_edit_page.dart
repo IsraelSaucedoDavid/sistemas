@@ -29,6 +29,7 @@ class _AssetEditPageState extends State<AssetEditPage> {
   late TextEditingController _notesCtrl;
   late String _selectedStatus;
   late String? _selectedTypeId;
+  late List<AssetTypeOption> _localAssetTypes;
 
   List<PhotoDocument> _photos = [];
   bool _loadingPhotos = false;
@@ -47,7 +48,80 @@ class _AssetEditPageState extends State<AssetEditPage> {
     _notesCtrl = TextEditingController(text: widget.asset.notes ?? '');
     _selectedStatus = widget.asset.status;
     _selectedTypeId = widget.asset.assetTypeId;
+    _localAssetTypes = List.from(widget.assetTypes);
     _loadPhotos();
+  }
+
+  Future<void> _refreshAssetTypes() async {
+    try {
+      final response = await _client.schema('sistema').from('asset_types').select('id, name').order('name');
+      setState(() {
+        _localAssetTypes = (response as List<dynamic>)
+            .map((e) => AssetTypeOption.fromMap(e as Map<String, dynamic>))
+            .toList();
+      });
+    } catch (e) {
+      debugPrint('Error refreshing types: $e');
+    }
+  }
+
+  Future<void> _showAddAssetTypeDialog() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Nuevo tipo de activo'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'Nombre del tipo',
+            hintText: 'Ej: Laptop, Monitor...',
+          ),
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Agregar'),
+          ),
+        ],
+      ),
+    );
+
+    if (name != null && name.isNotEmpty) {
+      setState(() => _saving = true);
+      try {
+        final result = await _client.schema('sistema').from('asset_types').insert({
+          'name': name,
+        }).select().single();
+
+        final newType = AssetTypeOption.fromMap(result);
+        
+        await _refreshAssetTypes();
+        setState(() {
+          _selectedTypeId = newType.id;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Tipo "$name" agregado')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          );
+        }
+      } finally {
+        setState(() => _saving = false);
+      }
+    }
   }
 
   @override
@@ -213,13 +287,29 @@ class _AssetEditPageState extends State<AssetEditPage> {
                         decoration: const InputDecoration(labelText: 'Numero de serie'),
                       ),
                       const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: _selectedTypeId,
-                        decoration: const InputDecoration(labelText: 'Tipo de activo'),
-                        items: widget.assetTypes
-                            .map((t) => DropdownMenuItem(value: t.id, child: Text(t.name)))
-                            .toList(),
-                        onChanged: (v) => setState(() => _selectedTypeId = v),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              initialValue: _selectedTypeId,
+                              decoration: const InputDecoration(labelText: 'Tipo de activo'),
+                              items: _localAssetTypes
+                                  .map((t) => DropdownMenuItem(value: t.id, child: Text(t.name)))
+                                  .toList(),
+                              onChanged: (v) => setState(() => _selectedTypeId = v),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: IconButton.filledTonal(
+                              onPressed: _saving ? null : _showAddAssetTypeDialog,
+                              icon: const Icon(Icons.add),
+                              tooltip: 'Agregar nuevo tipo',
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -233,7 +323,7 @@ class _AssetEditPageState extends State<AssetEditPage> {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        value: _selectedStatus,
+                        initialValue: _selectedStatus,
                         decoration: const InputDecoration(labelText: 'Estatus'),
                         items: widget.statusOptions
                             .map((s) => DropdownMenuItem(value: s, child: Text(_statusLabel(s))))
