@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'app_theme.dart';
 import 'dashboard_page.dart';
@@ -15,7 +14,7 @@ void main() async {
   
   await Supabase.initialize(
     url: 'https://smnaclfbrefnzrjblfhp.supabase.co',
-    anonKey: 'sb_publishable_NkiA1_tDkTF4AVJ21NTBcA_s1QuChk5',
+    anonKey: 'sb_publishable_ZVwXs8zxnrqRg-0pjtGq_g_AkR2nFu_',
   );
 
   runApp(const MainApp());
@@ -30,12 +29,15 @@ class MainApp extends StatefulWidget {
 
 class _MainAppState extends State<MainApp> {
   final _themeModeController = ThemeModeController();
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
     super.initState();
-    // Initialize notifications in the background
-    NotificationService().init();
+    // Initialize notifications and set navigator key
+    final notifService = NotificationService();
+    notifService.setNavigatorKey(_navigatorKey);
+    notifService.init();
   }
 
   @override
@@ -52,6 +54,7 @@ class _MainAppState extends State<MainApp> {
         valueListenable: _themeModeController,
         builder: (context, mode, _) {
           return MaterialApp(
+            navigatorKey: _navigatorKey,
             debugShowCheckedModeBanner: false,
             theme: AppTheme.light(),
             darkTheme: AppTheme.dark(),

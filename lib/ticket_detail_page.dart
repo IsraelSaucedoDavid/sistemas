@@ -412,7 +412,7 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             itemCount: t.imageUrls.length,
-                            separatorBuilder: (_, __) => const SizedBox(width: 8),
+                            separatorBuilder: (sepCtx, sepI) => const SizedBox(width: 8),
                             itemBuilder: (context, index) {
                               final url = t.imageUrls[index];
                               return GestureDetector(
@@ -424,7 +424,7 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                                     width: 120,
                                     height: 120,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
+                                    errorBuilder: (errCtx, errObj, errSt) => Container(
                                       width: 120,
                                       height: 120,
                                       color: scheme.surfaceContainerHighest,

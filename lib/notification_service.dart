@@ -5,7 +5,12 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'ticket_detail_page.dart';
+import 'dart:async';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -18,6 +23,17 @@ class NotificationService {
   NotificationService._internal();
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  
+  // Stream para avisar que llegó algo nuevo
+  final _onNotificationReceived = StreamController<void>.broadcast();
+  Stream<void> get onNotificationReceived => _onNotificationReceived.stream;
+
+  // Global Navigator Key para poder navegar desde aquí
+  GlobalKey<NavigatorState>? _navigatorKey;
+  
+  void setNavigatorKey(GlobalKey<NavigatorState> key) {
+    _navigatorKey = key;
+  }
 
   Future<void> init() async {
     debugPrint('NotificationService: Starting init()');
@@ -57,7 +73,8 @@ class NotificationService {
       await flutterLocalNotificationsPlugin.initialize(
         settings: initializationSettings,
         onDidReceiveNotificationResponse: (details) {
-          debugPrint('Notification tapped: ${details.payload}');
+          debugPrint('Notification tapped local: ${details.payload}');
+          _handlePayload(details.payload);
         },
       );
       debugPrint('NotificationService: Plugin successfully initialized');
@@ -66,13 +83,38 @@ class NotificationService {
       await _initFirebaseMessaging();
 
       if (defaultTargetPlatform == TargetPlatform.android) {
-        final androidImplementation = flutterLocalNotificationsPlugin
+        final androidImpl = flutterLocalNotificationsPlugin
             .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-        await androidImplementation?.requestNotificationsPermission();
+
+        // Solicitar permiso POST_NOTIFICATIONS (Android 13+)
+        await androidImpl?.requestNotificationsPermission();
+
+        // Solicitar permiso de alarmas exactas
         try {
-          await androidImplementation?.requestExactAlarmsPermission();
+          await androidImpl?.requestExactAlarmsPermission();
         } catch (_) {}
-        debugPrint('NotificationService: Android permissions requested');
+
+        // ── Crear canales explícitamente para que aparezcan en Ajustes ──
+        const channelReminders = AndroidNotificationChannel(
+          'maintenance_reminders',
+          'Recordatorios de Mantenimiento',
+          description: 'Alertas de mantenimiento próximos y vencidos',
+          importance: Importance.max,
+          playSound: true,
+          enableVibration: true,
+        );
+        const channelTickets = AndroidNotificationChannel(
+          'tickets_channel',
+          'Tickets de Soporte',
+          description: 'Notificaciones de nuevos tickets y actualizaciones',
+          importance: Importance.high,
+          playSound: true,
+          enableVibration: true,
+        );
+
+        await androidImpl?.createNotificationChannel(channelReminders);
+        await androidImpl?.createNotificationChannel(channelTickets);
+        debugPrint('NotificationService: Canales de notificación registrados');
       }
     } catch (globalError) {
       debugPrint('NotificationService: FATAL error in init: $globalError');
@@ -164,6 +206,7 @@ class NotificationService {
     required int id,
     required String title,
     required String body,
+    String? payload,
   }) async {
     debugPrint('NotificationService: Attempting immediate notification');
     try {
@@ -172,7 +215,7 @@ class NotificationService {
         title: title,
         body: body,
         notificationDetails: _details(),
-        payload: 'immediate_$id',
+        payload: payload ?? 'immediate_$id',
       );
       debugPrint('NotificationService: Immediate notification displayed');
     } catch (e) {
@@ -198,23 +241,66 @@ class NotificationService {
     );
     debugPrint('User granted permission: ${settings.authorizationStatus}');
 
+    // Register token on server automatically
+    final token = await getToken();
+    if (token != null) {
+      await registerTokenOnServer(token);
+    }
+
     // Background handler
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
     // Foreground listener
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       debugPrint('Got a message whilst in the foreground!');
-      debugPrint('Message data: ${message.data}');
-
       if (message.notification != null) {
-        debugPrint('Message also contained a notification: ${message.notification?.title}');
         showImmediateNotification(
           id: message.hashCode,
           title: message.notification?.title ?? 'Nuevo Ticket',
           body: message.notification?.body ?? '',
+          payload: jsonEncode(message.data),
         );
       }
+      // Avisar a quien esté escuchando que se actualice (ej: Dashboard)
+      _onNotificationReceived.add(null);
     });
+
+    // ─── NUEVO: Manejar clics cuando la App está en segundo plano ───
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      debugPrint('Notification clicked (background): ${message.data}');
+      _handleData(message.data);
+    });
+
+    // ─── NUEVO: Manejar clics cuando la App estaba CERRADA ───
+    FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+      if (message != null) {
+        debugPrint('Notification clicked (terminated): ${message.data}');
+        _handleData(message.data);
+      }
+    });
+  }
+
+  void _handlePayload(String? payload) {
+    if (payload == null) return;
+    try {
+      if (payload.startsWith('{')) {
+        final data = jsonDecode(payload);
+        _handleData(data);
+      }
+    } catch (e) {
+      debugPrint('Error parsing notification payload: $e');
+    }
+  }
+
+  void _handleData(Map<String, dynamic> data) {
+    final ticketId = data['ticket_id']?.toString();
+    if (ticketId != null && _navigatorKey != null) {
+      _navigatorKey!.currentState?.push(
+        MaterialPageRoute(
+          builder: (_) => TicketDetailPage(ticketId: ticketId),
+        ),
+      );
+    }
   }
 
   Future<String?> getToken() async {
@@ -228,12 +314,34 @@ class NotificationService {
     }
   }
 
+  Future<void> registerTokenOnServer(String token) async {
+    final user = Supabase.instance.client.auth.currentUser;
+    final email = user?.email ?? 'admin';
+    
+    final url = Uri.parse('https://reclutamiento-promsan.com/api-sistemas/tickets/api_registrar_token.php');
+    
+    try {
+      debugPrint('NotificationService: Registering token for $email');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'token': token,
+          'email': email,
+        }),
+      );
+      debugPrint('NotificationService: Registration status: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('NotificationService: Error registering token: $e');
+    }
+  }
+
   /// Envía una notificación remota a través del puente PHP en Hostinger
   Future<void> sendRemoteNotification({
     required String title,
     required String body,
   }) async {
-    final url = Uri.parse('https://reclutamiento-promsan.com/conf/tickets/api_notificar.php');
+    final url = Uri.parse('https://reclutamiento-promsan.com/api-sistemas/tickets/api_notificar.php');
     try {
       final response = await http.post(
         url,
