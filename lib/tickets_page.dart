@@ -10,11 +10,35 @@ enum _FiltroTiempo { todos, hoy, semana, mes }
 extension _FiltroLabel on _FiltroTiempo {
   String get label {
     switch (this) {
-      case _FiltroTiempo.todos:  return 'Todos';
+      case _FiltroTiempo.todos:  return 'Cualquier fecha';
       case _FiltroTiempo.hoy:   return 'Hoy';
       case _FiltroTiempo.semana: return 'Esta semana';
       case _FiltroTiempo.mes:   return 'Este mes';
     }
+  }
+}
+
+// ─── Modelo de Estado de Filtros ───
+class TicketFilter {
+  String searchQuery = '';
+  List<String> estados = [];
+  List<String> prioridades = [];
+  List<String> urgencias = [];
+  _FiltroTiempo tiempo = _FiltroTiempo.todos;
+
+  bool get isActive => 
+    searchQuery.isNotEmpty || 
+    estados.isNotEmpty || 
+    prioridades.isNotEmpty || 
+    urgencias.isNotEmpty || 
+    tiempo != _FiltroTiempo.todos;
+
+  void clear() {
+    searchQuery = '';
+    estados.clear();
+    prioridades.clear();
+    urgencias.clear();
+    tiempo = _FiltroTiempo.todos;
   }
 }
 
@@ -25,57 +49,49 @@ class TicketsPage extends StatefulWidget {
   State<TicketsPage> createState() => _TicketsPageState();
 }
 
-class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  final List<String> _tabs       = ['Todos', 'Abierto', 'En proceso', 'En Pausa', 'Cerrado', 'Cancelado'];
-  final List<String> _tabValues  = ['todos', 'Abierto', 'En proceso', 'En Pausa', 'Cerrado', 'Cancelado'];
+class _TicketsPageState extends State<TicketsPage> {
+  List<Ticket> _tickets = [];
+  bool _loading = false;
+  String? _error;
+  bool _ascendente = false; // false = más recientes primero
+  
+  final TicketFilter _filter = TicketFilter();
+  final TextEditingController _searchController = TextEditingController();
 
-  List<Ticket> _tickets     = [];
-  bool         _loading     = false;
-  String?      _error;
-  bool         _ascendente  = false;                       // false = más recientes primero
-  _FiltroTiempo _filtroTiempo = _FiltroTiempo.todos;
+  final List<String> _todosLosEstados = ['Abierto', 'En proceso', 'En Pausa', 'Cerrado', 'Cancelado'];
+  final List<String> _todasLasPrioridades = ['Baja', 'Media', 'Alta', 'Crítica'];
+  final List<String> _todasLasUrgencias = ['Vencidos', 'Por Vencer', 'A tiempo'];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: _tabs.length, vsync: this);
-    _tabController.addListener(() {
-      if (!_tabController.indexIsChanging) _loadTickets();
-    });
+    _searchController.addListener(_onSearchChanged);
     _loadTickets();
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    setState(() {
+      _filter.searchQuery = _searchController.text.trim().toLowerCase();
+    });
   }
 
   Future<void> _loadTickets() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final estado = _tabValues[_tabController.index];
-      
-      // Calcular fecha_desde para la API
-      String? desde;
-      final now = DateTime.now();
-      if (_filtroTiempo == _FiltroTiempo.hoy) {
-        desde = DateFormat('yyyy-MM-dd').format(now);
-      } else if (_filtroTiempo == _FiltroTiempo.semana) {
-        desde = DateFormat('yyyy-MM-dd').format(now.subtract(const Duration(days: 7)));
-      } else if (_filtroTiempo == _FiltroTiempo.mes) {
-        desde = DateFormat('yyyy-MM-dd').format(DateTime(now.year, now.month, 1));
-      }
-
+      // Cargamos un lote de tickets para filtrarlos localmente
       final list = await TicketService.getTickets(
-        estado: estado, 
-        limit: (estado == 'todos') ? 500 : 200,
-        fechaDesde: desde,
+        estado: 'todos', 
+        limit: 500, // Limite amplio para busquedas locales
       );
       setState(() {
         _tickets = list;
-        debugPrint('TicketsPage: _tickets cargados (${list.length}) para estado: $estado');
+        debugPrint('TicketsPage: _tickets cargados base (${list.length})');
       });
     } catch (e) {
       setState(() => _error = e.toString());
@@ -84,31 +100,63 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
     }
   }
 
-  /// Aplica filtro de tiempo + orden localmente (sin nueva petición al servidor)
   List<Ticket> get _ticketsFiltrados {
-    final now   = DateTime.now();
+    final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
     var lista = _tickets.where((t) {
-      if (_filtroTiempo == _FiltroTiempo.todos) return true;
-      final dt = DateTime.tryParse(t.createdAt)?.toLocal();
-      if (dt == null) return false;
-
-      switch (_filtroTiempo) {
-        case _FiltroTiempo.hoy:
-          return dt.year == today.year && dt.month == today.month && dt.day == today.day;
-        case _FiltroTiempo.semana:
-          return dt.isAfter(today.subtract(const Duration(days: 7)));
-        case _FiltroTiempo.mes:
-          return dt.year == now.year && dt.month == now.month;
-        default:
-          return true;
+      // 1. Búsqueda por texto
+      if (_filter.searchQuery.isNotEmpty) {
+        final query = _filter.searchQuery;
+        final matchId = t.ticketId.toLowerCase().contains(query);
+        final matchAsunto = t.asunto.toLowerCase().contains(query);
+        final matchNombre = t.nombre.toLowerCase().contains(query);
+        if (!matchId && !matchAsunto && !matchNombre) return false;
       }
+
+      // 2. Estados múltiples
+      if (_filter.estados.isNotEmpty && !_filter.estados.contains(t.estado)) return false;
+
+      // 3. Prioridades múltiples
+      if (_filter.prioridades.isNotEmpty && !_filter.prioridades.contains(t.prioridad)) return false;
+
+      // 4. Urgencia (SLA)
+      if (_filter.urgencias.isNotEmpty) {
+        final secs = t.segundosRestantes ?? 0;
+        final hours = secs / 3600.0;
+        
+        bool match = false;
+        if (_filter.urgencias.contains('Vencidos') && secs <= 0) match = true;
+        if (_filter.urgencias.contains('Por Vencer') && secs > 0 && hours <= 2) match = true;
+        if (_filter.urgencias.contains('A tiempo') && hours > 2) match = true;
+        
+        if (!match) return false;
+      }
+
+      // 5. Filtro de Tiempo
+      if (_filter.tiempo != _FiltroTiempo.todos) {
+        final dt = DateTime.tryParse(t.createdAt)?.toLocal();
+        if (dt == null) return false;
+
+        switch (_filter.tiempo) {
+          case _FiltroTiempo.hoy:
+            if (!(dt.year == today.year && dt.month == today.month && dt.day == today.day)) return false;
+            break;
+          case _FiltroTiempo.semana:
+            if (!dt.isAfter(today.subtract(const Duration(days: 7)))) return false;
+            break;
+          case _FiltroTiempo.mes:
+            if (!(dt.year == now.year && dt.month == now.month)) return false;
+            break;
+          default:
+            break;
+        }
+      }
+
+      return true;
     }).toList();
 
-    debugPrint('TicketsPage: _ticketsFiltrados (${lista.length}) para filtro: ${_filtroTiempo.label}');
-
-    // Ordenar por created_at
+    // Ordenar
     lista.sort((a, b) {
       final dtA = DateTime.tryParse(a.createdAt) ?? DateTime(2000);
       final dtB = DateTime.tryParse(b.createdAt) ?? DateTime(2000);
@@ -164,6 +212,218 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
     } catch (_) { return raw; }
   }
 
+  void _abrirPanelFiltros() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final theme = Theme.of(context);
+            return DraggableScrollableSheet(
+              expand: false,
+              initialChildSize: 0.9,
+              maxChildSize: 0.9,
+              builder: (_, controller) {
+                return Column(
+                  children: [
+                    // Header del bottom sheet
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.filter_list_rounded),
+                          const SizedBox(width: 8),
+                          Text('Filtros Avanzados', style: theme.textTheme.titleLarge),
+                          const Spacer(),
+                          TextButton(
+                            onPressed: () {
+                              setModalState(() => _filter.clear());
+                              setState(() {}); // Update main page
+                            },
+                            child: const Text('Limpiar'),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: ListView(
+                        controller: controller,
+                        padding: const EdgeInsets.all(16),
+                        children: [
+                          // Sección: Estados
+                          Text('Estados', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _todosLosEstados.map((estado) {
+                              final isSelected = _filter.estados.contains(estado);
+                              return FilterChip(
+                                label: Text(estado),
+                                selected: isSelected,
+                                onSelected: (selected) {
+                                  setModalState(() {
+                                    if (selected) {
+                                      _filter.estados.add(estado);
+                                    } else {
+                                      _filter.estados.remove(estado);
+                                    }
+                                  });
+                                  setState(() {});
+                                },
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 24),
+                          
+                          // Sección: Prioridad
+                          Text('Prioridad', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _todasLasPrioridades.map((prioridad) {
+                              final isSelected = _filter.prioridades.contains(prioridad);
+                              return FilterChip(
+                                label: Text(prioridad),
+                                selected: isSelected,
+                                selectedColor: _prioridadColor(prioridad).withValues(alpha: 0.2),
+                                checkmarkColor: _prioridadColor(prioridad),
+                                onSelected: (selected) {
+                                  setModalState(() {
+                                    if (selected) {
+                                      _filter.prioridades.add(prioridad);
+                                    } else {
+                                      _filter.prioridades.remove(prioridad);
+                                    }
+                                  });
+                                  setState(() {});
+                                },
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Sección: Urgencia / SLA
+                          Text('Urgencia (SLA)', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _todasLasUrgencias.map((urgencia) {
+                              final isSelected = _filter.urgencias.contains(urgencia);
+                              return FilterChip(
+                                label: Text(urgencia),
+                                selected: isSelected,
+                                onSelected: (selected) {
+                                  setModalState(() {
+                                    if (selected) {
+                                      _filter.urgencias.add(urgencia);
+                                    } else {
+                                      _filter.urgencias.remove(urgencia);
+                                    }
+                                  });
+                                  setState(() {});
+                                },
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Sección: Tiempo
+                          Text('Fecha de Creación', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _FiltroTiempo.values.map((f) {
+                              final isSelected = _filter.tiempo == f;
+                              return ChoiceChip(
+                                label: Text(f.label),
+                                selected: isSelected,
+                                onSelected: (selected) {
+                                  if (selected) {
+                                    setModalState(() => _filter.tiempo = f);
+                                    setState(() {});
+                                  }
+                                },
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 40),
+                        ],
+                      ),
+                    ),
+                    // Botón inferior
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Ver Resultados'),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildActiveFiltersChips() {
+    List<Widget> chips = [];
+    
+    for (var estado in _filter.estados) {
+      chips.add(InputChip(
+        label: Text(estado, style: const TextStyle(fontSize: 12)),
+        onDeleted: () => setState(() => _filter.estados.remove(estado)),
+      ));
+    }
+    for (var prio in _filter.prioridades) {
+      chips.add(InputChip(
+        label: Text(prio, style: const TextStyle(fontSize: 12)),
+        onDeleted: () => setState(() => _filter.prioridades.remove(prio)),
+      ));
+    }
+    for (var urg in _filter.urgencias) {
+      chips.add(InputChip(
+        label: Text(urg, style: const TextStyle(fontSize: 12)),
+        onDeleted: () => setState(() => _filter.urgencias.remove(urg)),
+      ));
+    }
+    if (_filter.tiempo != _FiltroTiempo.todos) {
+      chips.add(InputChip(
+        label: Text(_filter.tiempo.label, style: const TextStyle(fontSize: 12)),
+        onDeleted: () => setState(() => _filter.tiempo = _FiltroTiempo.todos),
+      ));
+    }
+
+    if (chips.isEmpty) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: chips.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, index) => chips[index],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme  = Theme.of(context);
@@ -174,20 +434,6 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
       appBar: AppBar(
         title: const Text('Tickets de Soporte'),
         actions: [
-          // Botón de orden
-          Tooltip(
-            message: _ascendente ? 'Más recientes primero' : 'Más antiguos primero',
-            child: IconButton(
-              icon: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 250),
-                child: Icon(
-                  _ascendente ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-                  key: ValueKey(_ascendente),
-                ),
-              ),
-              onPressed: () => setState(() => _ascendente = !_ascendente),
-            ),
-          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Actualizar',
@@ -195,28 +441,67 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
           ),
           const ThemeToggleButton(),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          tabs: _tabs.map((t) => Tab(text: t)).toList(),
-        ),
       ),
       body: GradientBody(
         child: Column(
           children: [
-            // ── Filtros de tiempo ──
-            _FiltroTiempoBar(
-              seleccionado: _filtroTiempo,
-              onChanged: (f) {
-                setState(() => _filtroTiempo = f);
-                _loadTickets();
-              },
+            // ── Barra de Búsqueda y Botón Filtros ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Buscar ticket, asunto o usuario...',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 20),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  FocusScope.of(context).unfocus();
+                                },
+                              )
+                            : null,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(999),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                        fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: _filter.isActive ? scheme.primaryContainer : scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.tune_rounded, 
+                        color: _filter.isActive ? scheme.onPrimaryContainer : scheme.onSurfaceVariant
+                      ),
+                      onPressed: _abrirPanelFiltros,
+                      tooltip: 'Filtros Avanzados',
+                    ),
+                  ),
+                ],
+              ),
             ),
-            // ── Contador ──
+            
+            // ── Chips de Filtros Activos ──
+            _buildActiveFiltersChips(),
+            if (_filter.isActive) const SizedBox(height: 8),
+
+            // ── Contador y Orden ──
             if (!_loading && _error == null)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
                 child: Row(
                   children: [
                     Text(
@@ -224,13 +509,31 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
                       style: theme.textTheme.labelSmall?.copyWith(color: scheme.outline),
                     ),
                     const Spacer(),
-                    Text(
-                      _ascendente ? '↑ Más antiguos primero' : '↓ Más recientes primero',
-                      style: theme.textTheme.labelSmall?.copyWith(color: scheme.outline),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => setState(() => _ascendente = !_ascendente),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: Row(
+                          children: [
+                            Text(
+                              _ascendente ? 'Más antiguos' : 'Más recientes',
+                              style: theme.textTheme.labelSmall?.copyWith(color: scheme.primary),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              _ascendente ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                              size: 14,
+                              color: scheme.primary,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
+
             // ── Lista ──
             Expanded(
               child: _loading
@@ -260,7 +563,17 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
                                 children: [
                                   Icon(Icons.inbox_rounded, size: 64, color: scheme.outline),
                                   const SizedBox(height: 12),
-                                  Text('Sin tickets para este filtro', style: theme.textTheme.bodyLarge?.copyWith(color: scheme.outline)),
+                                  Text('No se encontraron tickets', style: theme.textTheme.bodyLarge?.copyWith(color: scheme.outline)),
+                                  if (_filter.isActive) ...[
+                                    const SizedBox(height: 8),
+                                    TextButton(
+                                      onPressed: () => setState(() {
+                                        _filter.clear();
+                                        _searchController.clear();
+                                      }),
+                                      child: const Text('Limpiar filtros'),
+                                    )
+                                  ]
                                 ],
                               ),
                             )
@@ -293,52 +606,6 @@ class _TicketsPageState extends State<TicketsPage> with SingleTickerProviderStat
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ─── Barra de filtros de tiempo ───
-class _FiltroTiempoBar extends StatelessWidget {
-  final _FiltroTiempo seleccionado;
-  final ValueChanged<_FiltroTiempo> onChanged;
-
-  const _FiltroTiempoBar({required this.seleccionado, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-      child: Row(
-        children: _FiltroTiempo.values.map((f) {
-          final active = f == seleccionado;
-          return Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: GestureDetector(
-              onTap: () => onChanged(f),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: active ? scheme.primary : scheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: active ? scheme.primary : scheme.outlineVariant,
-                  ),
-                ),
-                child: Text(
-                  f.label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: active ? FontWeight.bold : FontWeight.normal,
-                    color: active ? scheme.onPrimary : scheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }).toList(),
       ),
     );
   }

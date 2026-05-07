@@ -54,6 +54,7 @@ class _MainAppState extends State<MainApp> {
         valueListenable: _themeModeController,
         builder: (context, mode, _) {
           return MaterialApp(
+            title: 'TELECRAFT',
             navigatorKey: _navigatorKey,
             debugShowCheckedModeBanner: false,
             theme: AppTheme.light(),
