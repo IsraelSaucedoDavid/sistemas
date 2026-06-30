@@ -1,0 +1,228 @@
+
+1.	Objetivo:
+
+Establecer los lineamientos para garantizar la seguridad de la información, el correcto funcionamiento de la infraestructura tecnológica (Hardware y Software) y la adecuada gestión de los servicios de TI.
+
+Alcance:
+
+Aplica a todos los activos de información, sistemas, hardware y procesos de soporte técnico dentro de la organización, desde su asignación y uso, hasta el mantenimiento, respaldo y baja de los mismos.
+2.	Referencias:
+
+Estándares y subestándares OEA (Estándar 01, Subestándar 2.7)
+ISO 9001:2015
+
+3.	Definiciones:
+SGC. Sistema de gestión de calidad
+TI. Tecnologías de la Información
+Plataformas Operativas / Sistemas Internos. Aplicaciones web, móviles o de escritorio desarrolladas, alojadas o administradas por TI para la operación del negocio o de clientes (Ej. Sistema de Reclutamiento, portales EATON, TCP, App de Tickets, etc.).
+Activos de Información. Bases de datos, código fuente y registros generados por las Plataformas Operativas.
+4.	Responsabilidades del proceso:
+
+•	Dirección de operación
+•	Encargado del SGC
+•	Coordinación de TI
+5.	Descripción del Procedimiento:
+LINEAMIENTOS DE SEGURIDAD:
+
+No.	ACTIVIDAD	RESPONSABLE
+1	Implementar Sistema de Gestión de Seguridad: implementar la política de seguridad informática, para mantener la integridad, confidencialidad y disponibilidad de la información.	Administración
+/ TI
+2	Proteger la información de amenazas externas: se debe proteger la información de amenazas como Sabotaje, vandalismo, robo, intrusión, virus, violación derechos de autor.	Administración
+/ TI
+3	Proteger la información de sucesos físicos:
+Se debe proteger la información de sucesos de origen físico, como: sismo,
+polvo, sobrecarga eléctrica, falla de sistema, daño de Hardware y Software.	Administración
+/ TI
+4	Proteger la información de mal manejo: El usuario es responsable de su información institucional, se debe proteger la información de sucesos como: la impericia, negligencia, pérdida de datos.	Administración
+/ TI
+5	Verificar permisos: verificar en el servidor de archivo correspondan a los usuarios activos. 	Administración
+/ TI
+6	Realizar retroalimentación de acciones tomadas: determinar si las acciones para solucionar un problema de seguridad fueron eficientes y eficaces con el fin de entender las vulnerabilidades de la infraestructura de la Institución.	Administración
+/ TI
+7	Evaluar acciones de seguridad: Determinar si las acciones tomadas para solucionar un problema de seguridad informática fueron eficaces y realizar su respectiva retroalimentación con las partes involucradas.	Administración
+/ TI
+8	Denunciar amenazas ante la Entidad competente:
+Denunciar cualquier intento o incidente que perjudique la seguridad informática.	Administración
+/ TI
+9	Adquirir y renovar tecnología de seguridad:
+Actualizar regularmente Sw/Hw encaminados a la protección de la información: de los equipos conectados a la Red (servidores, equipos de oficina, equipos de acceso inalámbrico,etc.).	Administración
+/ TI
+10	Evaluar riegos periódicamente: Obtener la información oportuna sobre las vulnerabilidades técnicas de la seguridad informática.	Administración
+/ TI
+
+
+11	Verificar actualizaciones:
+La actualización del Sw operativo, las aplicaciones y las librerías de los programas deben ser realizadas por administradores capacitados.	Administración
+/ TI
+12	Conservar las versiones anteriores del Software:
+Se debe guardar las versiones anteriores de las diferentes aplicaciones de seguridad como medida de contingencia.	Administración
+/ TI
+13	Reiterar la obligación de los usuarios y/o terceras partes de acceder a los servicios:
+Se debe recordar la importancia de las contraseñas, sensibilizar sobre
+riesgos, recordar uso adecuado de los equipos asignados y recordar políticas de seguridad informática.	Administración
+/ TI
+14	Documentar y clasificar los procedimientos de operación de la seguridad informática:
+Facilitar el registro de la base del conocimiento y uso aceptable de la seguridad informática que se ha adquirido y permitir su posterior consulta
+a quien lo requiera.	Administración
+/ TI
+15	Identificar el riesgo residual de los equipos informáticos:
+Dar el apoyo para retirar los equipos quesean renovados o desechados y así procurar su buen tratamiento.	Administración
+/ TI
+
+
+
+
+
+
+
+
+
+
+
+
+
+COPIA DE SEGURIDAD DE INFORMACION:
+
+No.	ACTIVIDAD	RESPONSABLE
+1	Realizar copia de seguridad de Servidores y Bases de Datos:
+De forma automatizada o manual, se debe realizar copia de seguridad diaria (incremental) y semanal (completa) de los sistemas y bases de datos críticos.	Administración / TI
+
+2	Pruebas de Restauración y Programas fuentes:
+Se debe realizar una prueba de recuperación de datos (Restore) al menos de forma semestral para validar la integridad. Asimismo, se realizarán copias de seguridad de códigos fuente antes de cambios críticos.	Administración / TI
+3	Recibir solicitud de copia de seguridad:
+Recibir la solicitud de copia de seguridad cuando el funcionario hace entrega de su cargo, cambie de equipo o se desee archivar información.	Administración
+/ TI
+4	Realizar copia de seguridad Información:
+Copiar la información en algún medio externo para su respaldo.	Administración
+/ TI
+5	Custodiar la información:
+Almacenar la información en el lugar que disponga el área de administración por un lapso de 30 días.	Administración
+/ TI
+
+	MANTENIMIENTO PREVENTIVO:
+
+1	Revisión periódica de Hardware y Software:
+TI realizará revisiones programadas (físicas o lógicas) a los equipos críticos y de usuario final para depuración, actualizaciones y limpieza general, previniendo posibles fallos operativos.	TI
+
+	MANTENIMIENTO CORRECTIVO:
+
+
+
+1	Equipo de cómputo, celulares, CCTV, impresoras, modem, proyector: 
+La solicitud para mantenimiento o soporte de los dispositivos mencionados se deberá realizar a través de la Aplicación de Gestión de Tickets (App / Plataforma Web). 
+El usuario deberá ingresar la problemática, clasificar la prioridad (Baja, Media, Alta, Crítica) y adjuntar evidencia fotográfica del error. 
+
+Atención y SLA (Nivel de Servicio): El sistema asignará automáticamente un tiempo límite de resolución basado en la criticidad elegida:
+- Tickets Urgentes (Alta/Crítica): Resolución en máximo 24 horas.
+- Tickets Programables (Baja/Media): Resolución en máximo 168 horas.
+El área de TI y Administración recibirán de manera automatizada notificaciones Push y un correo electrónico formal con el número de Ticket asignado para su seguimiento y cierre.
+	Administración
+/ TI
+
+
+	 
+
+
+
+PROTECCIÓN DE SOFTWARE:
+
+
+No.	ACTIVIDAD	RESPONSABLE
+1	Instalar el agente del antivirus:
+En todo computador se debe instalar el agente del antivirus.	Administración
+/ TI
+2	Actualizar versión de agente del antivirus:
+Después de instalar se debe actualizar el agente con las ultimas directivas de seguridad.	Administración
+/ TI
+4	Aprobar Parches:
+Después de la prueba se deben aprobar parches ejecutables que estén liberados y estables.	Administración
+/ TI
+8	Recibir Solicitud para Recuperar Información:
+Recibir memorando del área solicitando la información que se quiere recuperar.	Administración
+/ TI
+9	Ubicar la información:
+Ubicar el medio magnético correspondiente o copia de seguridad lógico en el servidor de respaldo (SAN) o Data protector donde se puede encontrar la información.	Administración
+/ TI
+11	Informar al Usuario:
+Responder el memorando al usuario que realizo el requerimiento, se
+debe informara través del cuatro de texto del aplicativo Orfeo, la fecha de solución y el estado de la restauración.	Administración
+/ TI
+12	Monitorear Incidentes:
+Monitorearlas alertas o problemas que presenten los usuarios con la ejecución del software del Instituto.	Administración
+/ TI
+13	Verificar la presencia de códigos maliciosos:
+Monitorear el reporte de problemas en todos los archivos en medios ópticos	o	electrónicos,	archivos	adjuntos, descargas del correo
+electrónico, archivos recibidos, sitios Web antes de su uso y/o cuando se ingresa a la red del IPSE.	Administración
+/ TI
+14	Administrar Actualizaciones de equipos:
+El administrador deberá de estar en constante monitoreo de las actualizaciones de los equipos	Administración
+/ TI
+ 
+
+
+6.	IDENTIFICACIÓN DE RIESGOS
+
+•	Acceso interno y/o externo abusivo al Sistema Informático.
+•	Obstaculización ilegítima del sistema informático y/o red de telecomunicaciones.
+•	Daño informático.
+•	Uso de software malicioso.
+•	Violación de Datos Personales.
+•	Publicación e instalación de Sitios Web no permitidos en los servidores o hardware
+destinado para tal fin.
+•	Hurto por Medios Informáticos y Semejantes.
+•	Transferencia No Consentida de Activos.
+•	Daños en infraestructura tecnológica (IT).
+
+7.	ENTREGA DE EQUIPO DE COMPUTO/CELULARES Y CCTV / ACCESOS / CONTRASEÑAS:
+
+No.	ACTIVIDAD	RESPONSABLE
+1	Solicitud de acceso a cámaras: Se deberá mandar por medio de correo una solicitud escrita del personal, solicitando acceso a cámaras, al área de administración.	Personal
+2	Solicitud para entrega de equipo de cómputo o celular: Se deberá mandar por medio de correo una solicitud escrita del personal, solicitando acceso a cámaras, al área de administración.	Administración
+3	Contestación de correo confirmando el acceso a cámaras o entrega de equipo: El área de administración confirmara por medio de correo el permiso, así como también compartiendo el acceso / contraseñas	Personal / Administración
+4	Entrega de formato a Administración: Una vez que se llene correctamente el formato de entrega de equipo PE-05-F-013-RV01 Formato de entrega de equipo de cómputo - celular, debe de revisarse por personal de administración, para que se realice la entrega del acceso o equipo solicitado.	Personal / Administración
+5	Revocación de Accesos y Devolución de Equipo (Bajas): Al momento de notificarse la baja de un colaborador, TI y Administración procederán inmediatamente a deshabilitar cuentas, correos y accesos (SLA 24h), y a recibir el equipo físico para su resguardo.	Administración / TI
+ 
+
+
+8.	MONITOREO Y ACCESO DE CCTV:
+
+No.	ACTIVIDAD	RESPONSABLE
+1	Acceso controlado: El responsable del cuarto de CCTV deberá
+garantizar que este se encuentre cerrado y que ninguna persona tenga acceso a él. 	Dirección / Encargado de almacén / TI 
+2	Acceso restringido: Solo se podrá ingresar al cuarto de CCTV en compañía de los responsables.	Administración / TI
+3	Monitoreo de CCTV: Se cuenta con un sistema de CCTV que garantiza el poder visualizarlos, en el monitor o en el celular. (resguardo de 30 días).	Dirección / TI
+4	Acción y reacción ante un problema: Una vez que se identifique un problema de grabación o guardado de video se deberá de notificar a encargado de almacén y al área de TI para asegurar de que las cámaras estén correctamente conectadas o no sea una falla de la energía. 	Dirección/ Encargado de almacén/ TI
+
+9.	Indicadores de Desempeño (KPIs).
+
+Con el fin de medir la eficacia de este procedimiento, se evaluarán periódicamente los siguientes indicadores:
+- Cumplimiento de SLA en Soporte: % de tickets cerrados dentro del tiempo límite asignado.
+- Cumplimiento de Respaldos: % de ejecución exitosa de copias de seguridad y pruebas de restauración.
+
+10.	Registros.
+
+TÍTULO	CÓDIGO	REGISTRADO
+POR	ARCHIVA
+/ TIEMPO	DISPOSICIÓN
+Formato de entrega de equipo de cómputo - celular	PE-05-F-013-RV01	
+Administración	Administración / 1 año	Archivo Muerto
+
+11.	Control de cambios.
+
+CONTROL DE CAMBIOS
+Revisión	Fecha	Sección afectada	Descripción
+0	10/01/2023	Nueva Edición	Implementación de Procedimiento
+1	10/12/2024	Procedimiento	Revisión de procedimiento
+2	15/05/2026	Mantenimiento Correctivo	Integración de la App de Gestión de Tickets y SLAs.
+3	15/05/2026	Todo el documento	Actualización integral para cumplimiento ISO/SGC (Objetivos, Backups, Bajas y KPIs).
+12.	Anexos.
+No aplica
+
+
+
+Elaborado por
+Lesly de la Rosa	Revisado por:
+Santiago Luna	Aprobado por:
+Santiago Luna
+Fecha: 10/12/2024	Fecha: 10/12/2024	Fecha: 10/12/2024
+

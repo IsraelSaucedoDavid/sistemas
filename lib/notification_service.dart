@@ -306,33 +306,28 @@ class NotificationService {
   Future<String?> getToken() async {
     try {
       String? token = await FirebaseMessaging.instance.getToken();
-      debugPrint("FCM Token: $token");
       return token;
     } catch (e) {
-      debugPrint("Error getting token: $e");
+      debugPrint("NotificationService: Error getting token: $e");
       return null;
     }
   }
 
   Future<void> registerTokenOnServer(String token) async {
-    final user = Supabase.instance.client.auth.currentUser;
-    final email = user?.email ?? 'admin';
-    
-    final url = Uri.parse('https://reclutamiento-promsan.com/api-sistemas/tickets/api_registrar_token.php');
-    
     try {
-      debugPrint('NotificationService: Registering token for $email');
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'token': token,
-          'email': email,
-        }),
-      );
-      debugPrint('NotificationService: Registration status: ${response.statusCode}');
+      final user = Supabase.instance.client.auth.currentUser;
+      final email = user?.email ?? 'admin';
+      
+      debugPrint('NotificationService: Registering token for $email in Supabase');
+      
+      await Supabase.instance.client.from('user_tokens').upsert({
+        'email': email,
+        'fcm_token': token,
+      }, onConflict: 'fcm_token');
+      
+      debugPrint('NotificationService: Token registered successfully in Supabase');
     } catch (e) {
-      debugPrint('NotificationService: Error registering token: $e');
+      debugPrint('NotificationService: Error registering token in Supabase: $e');
     }
   }
 

@@ -85,6 +85,17 @@ class _NotificationsPageState extends State<NotificationsPage> {
         ),
         actions: [
           IconButton(
+            tooltip: 'Marcar todas como leídas',
+            icon: const Icon(Icons.done_all_rounded),
+            onPressed: () {
+              _markAllAsRead();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Notificaciones marcadas como leídas')),
+              );
+            },
+          ),
+          IconButton(
+            tooltip: 'Actualizar',
             icon: const Icon(Icons.refresh),
             onPressed: _loadNotifications,
           ),
@@ -170,11 +181,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
           ),
         );
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo abrir el detalle del ticket'),
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No se pudo abrir el detalle del ticket'),
+            ),
+          );
+        }
       }
     }
   }

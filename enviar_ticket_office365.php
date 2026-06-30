@@ -181,115 +181,63 @@ try {
     if ($stmt->execute()) {
         $ticket_id_db = $conn->insert_id;
 
-        // --- NOTIFICACIÓN PUSH Y REGISTRO EN SUPABASE (HÍBRIDO) ---
+        // --- DOBLE ESCRITURA Y DISPARO DE NOTIFICACIONES VÍA SUPABASE ---
         try {
-            // 1. Primero registrar en Supabase para el historial de la App
             $supabaseUrl = 'https://smnaclfbrefnzrjblfhp.supabase.co';
-            $supabaseKey = 'sb_publishable_ZVwXs8zxnrqRg-0pjtGq_g_AkR2nFu_';
+            $supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtbmFjbGZicmVmbnpyamJsZmhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MzYwMTEsImV4cCI6MjA5MjIxMjAxMX0.bo2-iClOuQQUzvNAR9UUAsbljwdcflY-vcWvsW_Y8Po';
+
+            // 1. Guardar copia del Ticket en Supabase (Esto dispara el Webhook -> Edge Function -> Push)
+            $ticket_data_sb = [
+                'ticket_id'    => $ticket_id,
+                'nombre'       => $nombre,
+                'asunto'       => $asunto_ticket,
+                'departamento' => $departamento,
+                'prioridad'    => $prioridad,
+                'estado'       => 'Abierto'
+            ];
+
+            $ch_ticket = curl_init("$supabaseUrl/rest/v1/tickets");
+            curl_setopt($ch_ticket, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch_ticket, CURLOPT_POST, true);
+            curl_setopt($ch_ticket, CURLOPT_POSTFIELDS, json_encode($ticket_data_sb));
+            curl_setopt($ch_ticket, CURLOPT_TIMEOUT, 5);
+            curl_setopt($ch_ticket, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch_ticket, CURLOPT_HTTPHEADER, [
+                "apikey: $supabaseKey",
+                "Authorization: Bearer $supabaseKey",
+                "Content-Type: application/json",
+                "Prefer: return=minimal"
+            ]);
+            curl_exec($ch_ticket);
+            curl_close($ch_ticket);
+
+            // 2. Registrar en la tabla de Historial de Notificaciones de la App
             $notif_data = [
                 'ticket_id' => $ticket_id,
                 'title'     => "Nuevo Ticket: $asunto_ticket",
                 'body'      => "De: $nombre ($departamento)",
-                'type'      => 'ticket_new'
+                'type'      => 'ticket_new',
+                'is_read'   => false
             ];
-            $ch_sb = curl_init("$supabaseUrl/rest/v1/notifications");
-            curl_setopt($ch_sb, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch_sb, CURLOPT_POST, true);
-            curl_setopt($ch_sb, CURLOPT_POSTFIELDS, json_encode($notif_data));
-            curl_setopt($ch_sb, CURLOPT_TIMEOUT, 3);
-            curl_setopt($ch_sb, CURLOPT_CONNECTTIMEOUT, 2);
-            curl_setopt($ch_sb, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch_sb, CURLOPT_HTTPHEADER, ["apikey: $supabaseKey", "Authorization: Bearer $supabaseKey", "Content-Type: application/json", "Prefer: return=minimal"]);
-            curl_exec($ch_sb);
-            curl_close($ch_sb);
+            $ch_notif = curl_init("$supabaseUrl/rest/v1/notifications");
+            curl_setopt($ch_notif, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch_notif, CURLOPT_POST, true);
+            curl_setopt($ch_notif, CURLOPT_POSTFIELDS, json_encode($notif_data));
+            curl_setopt($ch_notif, CURLOPT_TIMEOUT, 3);
+            curl_setopt($ch_notif, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch_notif, CURLOPT_HTTPHEADER, [
+                "apikey: $supabaseKey",
+                "Authorization: Bearer $supabaseKey",
+                "Content-Type: application/json",
+                "Prefer: return=minimal"
+            ]);
+            curl_exec($ch_notif);
+            curl_close($ch_notif);
 
-            // 2. Ahora enviar Push a Firebase
-            $sql_tokens = "SELECT token FROM tecnicos_tokens";
-            $res_tokens = $conn->query($sql_tokens);
-            $tokens_fcm = [];
-            if ($res_tokens) {
-                while ($row = $res_tokens->fetch_assoc()) { $tokens_fcm[] = $row['token']; }
-            }
-
-            if (!empty($tokens_fcm)) {
-                $posibles_rutas = [
-                    __DIR__ . '/../../api-sistemas/tickets/sistemas-25486-firebase-adminsdk-fbsvc-35160549db.json',
-                    __DIR__ . '/../api-sistemas/tickets/sistemas-25486-firebase-adminsdk-fbsvc-35160549db.json',
-                    __DIR__ . '/sistemas-25486-firebase-adminsdk-fbsvc-35160549db.json'
-                ];
-                
-                $fcmConfigPath = null;
-                foreach ($posibles_rutas as $ruta) { if (file_exists($ruta)) { $fcmConfigPath = $ruta; break; } }
-
-                if ($fcmConfigPath) {
-                    $fcmConfig = json_decode(file_get_contents($fcmConfigPath), true);
-                    $raw_key = $fcmConfig['private_key'];
-                    $key_body = str_replace(["-----BEGIN PRIVATE KEY-----", "-----END PRIVATE KEY-----", "-----BEGIN RSA PRIVATE KEY-----", "-----END RSA PRIVATE KEY-----", "\n", "\r", " ", "\\n"], "", $raw_key);
-                    $formatted_key = "-----BEGIN RSA PRIVATE KEY-----\n" . chunk_split($key_body, 64, "\n") . "-----END RSA PRIVATE KEY-----";
-                    
-                    $header = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(json_encode(['alg' => 'RS256', 'typ' => 'JWT'])));
-                    $payload = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(json_encode([
-                        'iss' => $fcmConfig['client_email'],
-                        'scope' => 'https://www.googleapis.com/auth/firebase.messaging',
-                        'aud' => $fcmConfig['token_uri'],
-                        'iat' => time(),
-                        'exp' => time() + 3600
-                    ])));
-                    
-                    $signature = '';
-                    if (openssl_sign("$header.$payload", $signature, $formatted_key, 'SHA256')) {
-                        $jwt = "$header.$payload." . str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($signature));
-                        $ch_auth = curl_init();
-                        curl_setopt($ch_auth, CURLOPT_URL, $fcmConfig['token_uri']);
-                        curl_setopt($ch_auth, CURLOPT_POST, true);
-                        curl_setopt($ch_auth, CURLOPT_RETURNTRANSFER, true);
-                        curl_setopt($ch_auth, CURLOPT_POSTFIELDS, http_build_query(['grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer', 'assertion' => $jwt]));
-                        $res_auth = json_decode(curl_exec($ch_auth), true);
-                        curl_close($ch_auth);
-                        
-                        $accessToken = $res_auth['access_token'] ?? null;
-                        if ($accessToken) {
-                            foreach ($tokens_fcm as $tk) {
-                                $url_fcm = "https://fcm.googleapis.com/v1/projects/{$fcmConfig['project_id']}/messages:send";
-                                $msg_fcm = [
-                                    'message' => [
-                                        'token' => $tk,
-                                        'notification' => [
-                                            'title' => '🎫 Nuevo Ticket #' . $ticket_id,
-                                            'body' => "$asunto_ticket ($nombre)"
-                                        ],
-                                        'android' => [
-                                            'priority' => 'high',
-                                            'notification' => [
-                                                'channel_id' => 'tickets_channel',
-                                                'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
-                                                'sound' => 'default'
-                                            ]
-                                        ],
-                                        'data' => [
-                                            'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
-                                            'type' => 'new_ticket',
-                                            'ticket_id' => $ticket_id
-                                        ]
-                                    ]
-                                ];
-                                $ch_send = curl_init();
-                                curl_setopt($ch_send, CURLOPT_URL, $url_fcm);
-                                curl_setopt($ch_send, CURLOPT_POST, true);
-                                curl_setopt($ch_send, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $accessToken, 'Content-Type: application/json']);
-                                curl_setopt($ch_send, CURLOPT_RETURNTRANSFER, true);
-                                curl_setopt($ch_send, CURLOPT_POSTFIELDS, json_encode($msg_fcm));
-                                curl_exec($ch_send);
-                                curl_close($ch_send);
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (Exception $e_fcm) {
-            error_log("Notification Error: " . $e_fcm->getMessage());
+        } catch (Exception $e_sb) {
+            error_log("Supabase Sync Error: " . $e_sb->getMessage());
         }
-        // --- FIN NOTIFICACIÓN ---
+        // --- FIN SINCRONIZACIÓN SUPABASE ---
 
         // Registrar en historial
         try {

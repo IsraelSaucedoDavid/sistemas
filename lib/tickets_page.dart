@@ -10,28 +10,32 @@ enum _FiltroTiempo { todos, hoy, semana, mes }
 extension _FiltroLabel on _FiltroTiempo {
   String get label {
     switch (this) {
-      case _FiltroTiempo.todos:  return 'Cualquier fecha';
-      case _FiltroTiempo.hoy:   return 'Hoy';
-      case _FiltroTiempo.semana: return 'Esta semana';
-      case _FiltroTiempo.mes:   return 'Este mes';
+      case _FiltroTiempo.todos:
+        return 'Cualquier fecha';
+      case _FiltroTiempo.hoy:
+        return 'Hoy';
+      case _FiltroTiempo.semana:
+        return 'Esta semana';
+      case _FiltroTiempo.mes:
+        return 'Este mes';
     }
   }
 }
 
 // ─── Modelo de Estado de Filtros ───
-class TicketFilter {
+class _TicketFilter {
   String searchQuery = '';
   List<String> estados = [];
   List<String> prioridades = [];
   List<String> urgencias = [];
   _FiltroTiempo tiempo = _FiltroTiempo.todos;
 
-  bool get isActive => 
-    searchQuery.isNotEmpty || 
-    estados.isNotEmpty || 
-    prioridades.isNotEmpty || 
-    urgencias.isNotEmpty || 
-    tiempo != _FiltroTiempo.todos;
+  bool get isActive =>
+      searchQuery.isNotEmpty ||
+      estados.isNotEmpty ||
+      prioridades.isNotEmpty ||
+      urgencias.isNotEmpty ||
+      tiempo != _FiltroTiempo.todos;
 
   void clear() {
     searchQuery = '';
@@ -54,13 +58,28 @@ class _TicketsPageState extends State<TicketsPage> {
   bool _loading = false;
   String? _error;
   bool _ascendente = false; // false = más recientes primero
-  
-  final TicketFilter _filter = TicketFilter();
+
+  final _TicketFilter _filter = _TicketFilter();
   final TextEditingController _searchController = TextEditingController();
 
-  final List<String> _todosLosEstados = ['Abierto', 'En proceso', 'En Pausa', 'Cerrado', 'Cancelado'];
-  final List<String> _todasLasPrioridades = ['Baja', 'Media', 'Alta', 'Crítica'];
-  final List<String> _todasLasUrgencias = ['Vencidos', 'Por Vencer', 'A tiempo'];
+  final List<String> _todosLosEstados = [
+    'Abierto',
+    'En proceso',
+    'En Pausa',
+    'Cerrado',
+    'Cancelado',
+  ];
+  final List<String> _todasLasPrioridades = [
+    'Baja',
+    'Media',
+    'Alta',
+    'Crítica',
+  ];
+  final List<String> _todasLasUrgencias = [
+    'Vencidos',
+    'Por Vencer',
+    'A tiempo',
+  ];
 
   @override
   void initState() {
@@ -82,11 +101,14 @@ class _TicketsPageState extends State<TicketsPage> {
   }
 
   Future<void> _loadTickets() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       // Cargamos un lote de tickets para filtrarlos localmente
       final list = await TicketService.getTickets(
-        estado: 'todos', 
+        estado: 'todos',
         limit: 500, // Limite amplio para busquedas locales
       );
       setState(() {
@@ -115,21 +137,28 @@ class _TicketsPageState extends State<TicketsPage> {
       }
 
       // 2. Estados múltiples
-      if (_filter.estados.isNotEmpty && !_filter.estados.contains(t.estado)) return false;
+      if (_filter.estados.isNotEmpty && !_filter.estados.contains(t.estado)) {
+        return false;
+      }
 
       // 3. Prioridades múltiples
-      if (_filter.prioridades.isNotEmpty && !_filter.prioridades.contains(t.prioridad)) return false;
+      if (_filter.prioridades.isNotEmpty &&
+          !_filter.prioridades.contains(t.prioridad)) {
+        return false;
+      }
 
       // 4. Urgencia (SLA)
       if (_filter.urgencias.isNotEmpty) {
         final secs = t.segundosRestantes ?? 0;
         final hours = secs / 3600.0;
-        
+
         bool match = false;
         if (_filter.urgencias.contains('Vencidos') && secs <= 0) match = true;
-        if (_filter.urgencias.contains('Por Vencer') && secs > 0 && hours <= 2) match = true;
+        if (_filter.urgencias.contains('Por Vencer') && secs > 0 && hours <= 2) {
+          match = true;
+        }
         if (_filter.urgencias.contains('A tiempo') && hours > 2) match = true;
-        
+
         if (!match) return false;
       }
 
@@ -140,10 +169,16 @@ class _TicketsPageState extends State<TicketsPage> {
 
         switch (_filter.tiempo) {
           case _FiltroTiempo.hoy:
-            if (!(dt.year == today.year && dt.month == today.month && dt.day == today.day)) return false;
+            if (!(dt.year == today.year &&
+                dt.month == today.month &&
+                dt.day == today.day)) {
+              return false;
+            }
             break;
           case _FiltroTiempo.semana:
-            if (!dt.isAfter(today.subtract(const Duration(days: 7)))) return false;
+            if (!dt.isAfter(today.subtract(const Duration(days: 7)))) {
+              return false;
+            }
             break;
           case _FiltroTiempo.mes:
             if (!(dt.year == now.year && dt.month == now.month)) return false;
@@ -169,21 +204,31 @@ class _TicketsPageState extends State<TicketsPage> {
   // ─── Colores ───
   Color _prioridadColor(String p) {
     switch (p) {
-      case 'Crítica': return const Color(0xFFD32F2F);
-      case 'Alta':    return const Color(0xFFE64A19);
-      case 'Media':   return const Color(0xFFF57F17);
-      default:        return const Color(0xFF388E3C);
+      case 'Crítica':
+        return const Color(0xFFD32F2F);
+      case 'Alta':
+        return const Color(0xFFE64A19);
+      case 'Media':
+        return const Color(0xFFF57F17);
+      default:
+        return const Color(0xFF388E3C);
     }
   }
 
   Color _estadoColor(String e) {
     switch (e) {
-      case 'Abierto':    return const Color(0xFF1565C0);
-      case 'En proceso': return const Color(0xFF6A1B9A);
-      case 'En Pausa':   return const Color(0xFFF57F17);
-      case 'Cerrado':    return const Color(0xFF2E7D32);
-      case 'Cancelado':  return const Color(0xFF616161);
-      default:           return Colors.grey;
+      case 'Abierto':
+        return const Color(0xFF1565C0);
+      case 'En proceso':
+        return const Color(0xFF6A1B9A);
+      case 'En Pausa':
+        return const Color(0xFFF57F17);
+      case 'Cerrado':
+        return const Color(0xFF2E7D32);
+      case 'Cancelado':
+        return const Color(0xFF616161);
+      default:
+        return Colors.grey;
     }
   }
 
@@ -208,8 +253,12 @@ class _TicketsPageState extends State<TicketsPage> {
   String _formatDate(String? raw) {
     if (raw == null || raw.isEmpty) return '—';
     try {
-      return DateFormat('dd/MM/yyyy HH:mm').format(DateTime.parse(raw).toLocal());
-    } catch (_) { return raw; }
+      return DateFormat(
+        'dd/MM/yyyy HH:mm',
+      ).format(DateTime.parse(raw).toLocal());
+    } catch (_) {
+      return raw;
+    }
   }
 
   void _abrirPanelFiltros() {
@@ -235,7 +284,10 @@ class _TicketsPageState extends State<TicketsPage> {
                         children: [
                           const Icon(Icons.filter_list_rounded),
                           const SizedBox(width: 8),
-                          Text('Filtros Avanzados', style: theme.textTheme.titleLarge),
+                          Text(
+                            'Filtros Avanzados',
+                            style: theme.textTheme.titleLarge,
+                          ),
                           const Spacer(),
                           TextButton(
                             onPressed: () {
@@ -258,13 +310,20 @@ class _TicketsPageState extends State<TicketsPage> {
                         padding: const EdgeInsets.all(16),
                         children: [
                           // Sección: Estados
-                          Text('Estados', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          Text(
+                            'Estados',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
                             children: _todosLosEstados.map((estado) {
-                              final isSelected = _filter.estados.contains(estado);
+                              final isSelected = _filter.estados.contains(
+                                estado,
+                              );
                               return FilterChip(
                                 label: Text(estado),
                                 selected: isSelected,
@@ -282,19 +341,28 @@ class _TicketsPageState extends State<TicketsPage> {
                             }).toList(),
                           ),
                           const SizedBox(height: 24),
-                          
+
                           // Sección: Prioridad
-                          Text('Prioridad', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          Text(
+                            'Prioridad',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
                             children: _todasLasPrioridades.map((prioridad) {
-                              final isSelected = _filter.prioridades.contains(prioridad);
+                              final isSelected = _filter.prioridades.contains(
+                                prioridad,
+                              );
                               return FilterChip(
                                 label: Text(prioridad),
                                 selected: isSelected,
-                                selectedColor: _prioridadColor(prioridad).withValues(alpha: 0.2),
+                                selectedColor: _prioridadColor(
+                                  prioridad,
+                                ).withValues(alpha: 0.2),
                                 checkmarkColor: _prioridadColor(prioridad),
                                 onSelected: (selected) {
                                   setModalState(() {
@@ -312,13 +380,20 @@ class _TicketsPageState extends State<TicketsPage> {
                           const SizedBox(height: 24),
 
                           // Sección: Urgencia / SLA
-                          Text('Urgencia (SLA)', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          Text(
+                            'Urgencia (SLA)',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
                             children: _todasLasUrgencias.map((urgencia) {
-                              final isSelected = _filter.urgencias.contains(urgencia);
+                              final isSelected = _filter.urgencias.contains(
+                                urgencia,
+                              );
                               return FilterChip(
                                 label: Text(urgencia),
                                 selected: isSelected,
@@ -338,7 +413,12 @@ class _TicketsPageState extends State<TicketsPage> {
                           const SizedBox(height: 24),
 
                           // Sección: Tiempo
-                          Text('Fecha de Creación', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                          Text(
+                            'Fecha de Creación',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           Wrap(
                             spacing: 8,
@@ -384,30 +464,41 @@ class _TicketsPageState extends State<TicketsPage> {
 
   Widget _buildActiveFiltersChips() {
     List<Widget> chips = [];
-    
+
     for (var estado in _filter.estados) {
-      chips.add(InputChip(
-        label: Text(estado, style: const TextStyle(fontSize: 12)),
-        onDeleted: () => setState(() => _filter.estados.remove(estado)),
-      ));
+      chips.add(
+        InputChip(
+          label: Text(estado, style: const TextStyle(fontSize: 12)),
+          onDeleted: () => setState(() => _filter.estados.remove(estado)),
+        ),
+      );
     }
     for (var prio in _filter.prioridades) {
-      chips.add(InputChip(
-        label: Text(prio, style: const TextStyle(fontSize: 12)),
-        onDeleted: () => setState(() => _filter.prioridades.remove(prio)),
-      ));
+      chips.add(
+        InputChip(
+          label: Text(prio, style: const TextStyle(fontSize: 12)),
+          onDeleted: () => setState(() => _filter.prioridades.remove(prio)),
+        ),
+      );
     }
     for (var urg in _filter.urgencias) {
-      chips.add(InputChip(
-        label: Text(urg, style: const TextStyle(fontSize: 12)),
-        onDeleted: () => setState(() => _filter.urgencias.remove(urg)),
-      ));
+      chips.add(
+        InputChip(
+          label: Text(urg, style: const TextStyle(fontSize: 12)),
+          onDeleted: () => setState(() => _filter.urgencias.remove(urg)),
+        ),
+      );
     }
     if (_filter.tiempo != _FiltroTiempo.todos) {
-      chips.add(InputChip(
-        label: Text(_filter.tiempo.label, style: const TextStyle(fontSize: 12)),
-        onDeleted: () => setState(() => _filter.tiempo = _FiltroTiempo.todos),
-      ));
+      chips.add(
+        InputChip(
+          label: Text(
+            _filter.tiempo.label,
+            style: const TextStyle(fontSize: 12),
+          ),
+          onDeleted: () => setState(() => _filter.tiempo = _FiltroTiempo.todos),
+        ),
+      );
     }
 
     if (chips.isEmpty) return const SizedBox.shrink();
@@ -418,7 +509,7 @@ class _TicketsPageState extends State<TicketsPage> {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: chips.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (_, index) => chips[index],
       ),
     );
@@ -426,7 +517,7 @@ class _TicketsPageState extends State<TicketsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme  = Theme.of(context);
+    final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final filtrados = _ticketsFiltrados;
 
@@ -465,26 +556,37 @@ class _TicketsPageState extends State<TicketsPage> {
                                 },
                               )
                             : null,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 0,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(999),
                           borderSide: BorderSide.none,
                         ),
                         filled: true,
-                        fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                        fillColor: scheme.surfaceContainerHighest.withValues(
+                          alpha: 0.5,
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Container(
                     decoration: BoxDecoration(
-                      color: _filter.isActive ? scheme.primaryContainer : scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                      color: _filter.isActive
+                          ? scheme.primaryContainer
+                          : scheme.surfaceContainerHighest.withValues(
+                              alpha: 0.5,
+                            ),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: IconButton(
                       icon: Icon(
-                        Icons.tune_rounded, 
-                        color: _filter.isActive ? scheme.onPrimaryContainer : scheme.onSurfaceVariant
+                        Icons.tune_rounded,
+                        color: _filter.isActive
+                            ? scheme.onPrimaryContainer
+                            : scheme.onSurfaceVariant,
                       ),
                       onPressed: _abrirPanelFiltros,
                       tooltip: 'Filtros Avanzados',
@@ -493,7 +595,7 @@ class _TicketsPageState extends State<TicketsPage> {
                 ],
               ),
             ),
-            
+
             // ── Chips de Filtros Activos ──
             _buildActiveFiltersChips(),
             if (_filter.isActive) const SizedBox(height: 8),
@@ -506,23 +608,32 @@ class _TicketsPageState extends State<TicketsPage> {
                   children: [
                     Text(
                       '${filtrados.length} ticket${filtrados.length != 1 ? "s" : ""}',
-                      style: theme.textTheme.labelSmall?.copyWith(color: scheme.outline),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: scheme.outline,
+                      ),
                     ),
                     const Spacer(),
                     InkWell(
                       borderRadius: BorderRadius.circular(8),
                       onTap: () => setState(() => _ascendente = !_ascendente),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         child: Row(
                           children: [
                             Text(
                               _ascendente ? 'Más antiguos' : 'Más recientes',
-                              style: theme.textTheme.labelSmall?.copyWith(color: scheme.primary),
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: scheme.primary,
+                              ),
                             ),
                             const SizedBox(width: 4),
                             Icon(
-                              _ascendente ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                              _ascendente
+                                  ? Icons.arrow_upward_rounded
+                                  : Icons.arrow_downward_rounded,
                               size: 14,
                               color: scheme.primary,
                             ),
@@ -539,70 +650,97 @@ class _TicketsPageState extends State<TicketsPage> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.cloud_off_rounded, size: 64, color: scheme.error),
-                                const SizedBox(height: 16),
-                                Text('Error al cargar tickets', style: theme.textTheme.titleMedium),
-                                const SizedBox(height: 8),
-                                Text(_error!, style: theme.textTheme.bodySmall, textAlign: TextAlign.center),
-                                const SizedBox(height: 24),
-                                FilledButton.icon(onPressed: _loadTickets, icon: const Icon(Icons.refresh), label: const Text('Reintentar')),
-                              ],
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.cloud_off_rounded,
+                              size: 64,
+                              color: scheme.error,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Error al cargar tickets',
+                              style: theme.textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _error!,
+                              style: theme.textTheme.bodySmall,
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 24),
+                            FilledButton.icon(
+                              onPressed: _loadTickets,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Reintentar'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : filtrados.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.inbox_rounded,
+                            size: 64,
+                            color: scheme.outline,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No se encontraron tickets',
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: scheme.outline,
                             ),
                           ),
-                        )
-                      : filtrados.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.inbox_rounded, size: 64, color: scheme.outline),
-                                  const SizedBox(height: 12),
-                                  Text('No se encontraron tickets', style: theme.textTheme.bodyLarge?.copyWith(color: scheme.outline)),
-                                  if (_filter.isActive) ...[
-                                    const SizedBox(height: 8),
-                                    TextButton(
-                                      onPressed: () => setState(() {
-                                        _filter.clear();
-                                        _searchController.clear();
-                                      }),
-                                      child: const Text('Limpiar filtros'),
-                                    )
-                                  ]
-                                ],
-                              ),
-                            )
-                          : RefreshIndicator(
-                              onRefresh: _loadTickets,
-                              child: ListView.builder(
-                                padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-                                itemCount: filtrados.length,
-                                itemBuilder: (context, index) {
-                                  final t = filtrados[index];
-                                  return _TicketCard(
-                                    ticket: t,
-                                    prioridadColor: _prioridadColor(t.prioridad),
-                                    estadoColor: _estadoColor(t.estado),
-                                    tiempoRestante: _formatTiempoRestante(t.segundosRestantes),
-                                    tiempoColor: _tiempoColor(t.segundosRestantes),
-                                    fechaCreacion: _formatDate(t.createdAt),
-                                    onTap: () async {
-                                      await Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => TicketDetailPage(ticketId: t.ticketId),
-                                        ),
-                                      );
-                                      _loadTickets();
-                                    },
-                                  );
-                                },
-                              ),
+                          if (_filter.isActive) ...[
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: () => setState(() {
+                                _filter.clear();
+                                _searchController.clear();
+                              }),
+                              child: const Text('Limpiar filtros'),
                             ),
+                          ],
+                        ],
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _loadTickets,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+                        itemCount: filtrados.length,
+                        itemBuilder: (context, index) {
+                          final t = filtrados[index];
+                          return _TicketCard(
+                            ticket: t,
+                            prioridadColor: _prioridadColor(t.prioridad),
+                            estadoColor: _estadoColor(t.estado),
+                            tiempoRestante: _formatTiempoRestante(
+                              t.segundosRestantes,
+                            ),
+                            tiempoColor: _tiempoColor(t.segundosRestantes),
+                            fechaCreacion: _formatDate(t.createdAt),
+                            onTap: () async {
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      TicketDetailPage(ticketId: t.ticketId),
+                                ),
+                              );
+                              _loadTickets();
+                            },
+                          );
+                        },
+                      ),
+                    ),
             ),
           ],
         ),
@@ -660,11 +798,15 @@ class _TicketCard extends StatelessWidget {
                       children: [
                         Text(
                           ticket.ticketId,
-                          style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.outline,
+                          ),
                         ),
                         Text(
                           ticket.asunto,
-                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -678,7 +820,11 @@ class _TicketCard extends StatelessWidget {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Icon(Icons.person_outline, size: 14, color: theme.colorScheme.outline),
+                  Icon(
+                    Icons.person_outline,
+                    size: 14,
+                    color: theme.colorScheme.outline,
+                  ),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
@@ -692,9 +838,17 @@ class _TicketCard extends StatelessWidget {
               const SizedBox(height: 6),
               Row(
                 children: [
-                  _Chip(label: ticket.prioridad, color: prioridadColor, small: true),
+                  _Chip(
+                    label: ticket.prioridad,
+                    color: prioridadColor,
+                    small: true,
+                  ),
                   const SizedBox(width: 6),
-                  _Chip(label: ticket.tipoSolicitud, color: theme.colorScheme.secondary, small: true),
+                  _Chip(
+                    label: ticket.tipoSolicitud,
+                    color: theme.colorScheme.secondary,
+                    small: true,
+                  ),
                   const Spacer(),
                   Icon(Icons.timer_outlined, size: 13, color: tiempoColor),
                   const SizedBox(width: 3),
@@ -710,7 +864,9 @@ class _TicketCard extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 'Creado: $fechaCreacion',
-                style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.outline),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.outline,
+                ),
               ),
             ],
           ),
@@ -730,7 +886,10 @@ class _Chip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: small ? 7 : 10, vertical: small ? 3 : 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: small ? 7 : 10,
+        vertical: small ? 3 : 4,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
